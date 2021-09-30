@@ -47,11 +47,12 @@ level_sequence.set_reset_run_callback = function(reset_run_callback)
 end
 
 local function equal_levels(level_1, level_2)
+    if not level_1 or not level_2 then return end
     return level_1 == level_2 or (level_1.identifier ~= nil and level_1.identifier == level_2.identifier)
 end
 
-local function took_shortcut()
-    return not equal_levels(run_state.initial_level, levels[1])
+level_sequence.took_shortcut = function()
+    return run_state.initial_level and #sequence_state.levels > 0 and not equal_levels(run_state.initial_level, sequence_state.levels[1])
 end
 
 local function index_of_level(level)
@@ -63,13 +64,14 @@ local function index_of_level(level)
     end
     return nil
 end
+level_sequence.index_of_level = index_of_level
 
 local function next_level(level)
     level = level or run_state.current_level
     local index = index_of_level(level)
     if not index then return nil end
 
-    return sequence_state.levels[level+1]
+    return sequence_state.levels[index+1]
 end
 
 -- Allow clients to interact with copies of the level list so that they cannot rearrange, add,
@@ -89,7 +91,7 @@ level_sequence.set_levels = function(levels)
     end
 
     -- Make sure to only update the levels while not in a run.
-    if state.screen == SCREEN.CAMP then
+    if state.theme == THEME.BASE_CAMP or state.theme == 0 then
         sequence_state.levels = new_levels
         sequence_state.buffered_levels = nil
     else
@@ -104,10 +106,6 @@ set_callback(function()
         sequence_state.buffered_levels = nil
     end
 end, ON.CAMP)
-
-level_sequence.index_of_level = function(level)
-    return index_of_level(level)
-end
 
 ----------------
 ---- THEMES ----
@@ -187,7 +185,7 @@ level_sequence.set_level_will_load_callback = function(callback)
 end
 
 local loaded_level = nil
-local function load_level(level)
+local function load_level(level, ctx)
 	if loaded_level then
         if sequence_state.level_will_unload_callback then
             sequence_state.level_will_unload_callback(loaded_level)
@@ -213,7 +211,7 @@ set_callback(function(ctx)
 		return
 	end
 	local level = run_state.current_level
-	load_level(level)
+	load_level(level, ctx)
 end, ON.PRE_LOAD_LEVEL_FILES)
 
 ---------------------------
@@ -224,9 +222,18 @@ end, ON.PRE_LOAD_LEVEL_FILES)
 ---- CONTINUE RUN ----
 ----------------------
 
-level_sequence.load_run = function(level, attempts)
+level_sequence.load_run = function(level, attempts, time)
+    run_state.initial_level = sequence_state.levels[1]
     run_state.current_level = level
     run_state.attempts = attempts
+    run_state.total_time = time
+end
+
+level_sequence.load_shortcut = function(level)
+    run_state.current_level = level
+    run_state.initial_level = level
+    run_state.attempts = 0
+    run_state.total_time = 0
 end
 
 -----------------------
@@ -270,7 +277,7 @@ end, ON.TRANSITION)
 -- Since we are keeping track of time for the entire run even through deaths and resets, we must track
 -- what the time was on resets and level transitions.
 set_callback(function()
-    if state.screen == SCREEN.CAMP or not run_state.run_started then return end
+    if state.theme == THEME.BASE_CAMP or not run_state.run_started then return end
     if sequence_state.keep_progress then
         -- Save the time on reset so we can keep the timer going.
         run_state.total_time = state.time_total
@@ -281,17 +288,17 @@ set_callback(function()
 end, ON.RESET)
 
 set_callback(function()
-    if state.screen == SCREEN.CAMP or not run_state.run_started then return end
+    if state.theme == THEME.BASE_CAMP or not run_state.run_started then return end
     run_state.total_time = state.time_total
 end, ON.TRANSITION)
 
 set_callback(function()
-    if state.screen == SCREEN.CAMP then return end
+    if state.theme == THEME.BASE_CAMP then return end
     state.time_total = run_state.total_time
 end, ON.POST_LEVEL_GENERATION)
 
 set_callback(function()
-    if state.screen == SCREEN.CAMP then return end
+    if state.theme == THEME.BASE_CAMP then return end
     run_state.run_started = true
     run_state.attempts = run_state.attempts + 1
 end, ON.START)
@@ -325,6 +332,7 @@ end
 set_callback(function()
     local current_level = run_state.current_level
     local next_level_file = next_level()
+    if not current_level then return end
 
     if sequence_state.post_level_generation_callback then
         sequence_state.post_level_generation_callback(current_level)
@@ -343,7 +351,7 @@ set_callback(function()
     end
 
 	local exit_uids = get_entities_by_type(ENT_TYPE.FLOOR_DOOR_EXIT)
-	for _, exit_uid in exit_uids do
+	for _, exit_uid in pairs(exit_uids) do
 		local exit_ent = get_entity(exit_uid)
 		if exit_ent then
 			exit_ent.entered = false
@@ -362,5 +370,33 @@ set_callback(function()
 		end
 	end
 end, ON.POST_LEVEL_GENERATION)
+
+
+
+
+
+--------------
+---- CAMP ----
+--------------
+
+set_callback(function()	-- Replace the main entrance door with a door that leads to the first level (Dwelling).
+    local entrance_uids = get_entities_by_type(ENT_TYPE.FLOOR_DOOR_STARTING_EXIT)
+    if #entrance_uids > 0 then
+        local entrance_uid = entrance_uids[1]
+		local first_level = sequence_state.levels[1]
+        kill_entity(entrance_uid)
+        spawn_door(
+			42,
+			84,
+			LAYER.FRONT,
+			world_for_level(first_level),
+			level_for_level(first_level),
+			first_level.theme)
+    end
+end, ON.CAMP)
+
+---------------
+---- /CAMP ----
+---------------
 
 return level_sequence
