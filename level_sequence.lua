@@ -1,8 +1,8 @@
 local custom_levels = require("CustomLevels/custom_levels")
 custom_levels.set_directory("LevelSequence/CustomLevels")
+local button_prompts = require("ButtonPrompts/button_prompts")
 
-local level_sequence = {
-}
+local level_sequence = {}
 
 local sequence_state = {
     levels = {},
@@ -15,6 +15,11 @@ local sequence_state = {
     reset_run_callback = nil,
     on_completed_level = nil,
     on_win = nil,
+    on_prepare_level = nil,
+}
+
+local internal_callbacks = {
+    entrance_tile_code_callback = nil,
 }
 
 local run_state = {
@@ -73,39 +78,6 @@ local function next_level(level)
 
     return sequence_state.levels[index+1]
 end
-
--- Allow clients to interact with copies of the level list so that they cannot rearrange, add,
--- or remove levels without going through these methods.
-level_sequence.levels = function()
-    local levels = {}
-    for index, level in pairs(sequence_state.levels) do
-        levels[index] = level
-    end
-    return levels
-end
-
-level_sequence.set_levels = function(levels)
-    local new_levels = {}
-    for index, level in pairs(levels) do
-        new_levels[index] = level
-    end
-
-    -- Make sure to only update the levels while not in a run.
-    if state.theme == THEME.BASE_CAMP or state.theme == 0 then
-        sequence_state.levels = new_levels
-        sequence_state.buffered_levels = nil
-    else
-        sequence_state.buffered_levels  = new_levels
-    end
-end
-
--- If the levels were updated while on a run, apply the changes when entering the camp.
-set_callback(function()
-    if sequence_state.buffered_levels then
-        sequence_state.levels = sequence_state.buffered_levels
-        sequence_state.buffered_levels = nil
-    end
-end, ON.CAMP)
 
 ----------------
 ---- THEMES ----
@@ -330,6 +302,7 @@ level_sequence.set_post_level_generation_callback = function(post_level_generati
 end
 
 set_callback(function()
+    if state.theme == THEME.BASE_CAMP then return end
     local current_level = run_state.current_level
     local next_level_file = next_level()
     if not current_level then return end
@@ -371,32 +344,363 @@ set_callback(function()
 	end
 end, ON.POST_LEVEL_GENERATION)
 
-
-
-
-
 --------------
 ---- CAMP ----
 --------------
 
+local function texture_for_theme(theme, co_subtheme)
+    if theme == THEME.DWELLING then
+        return TEXTURE.DATA_TEXTURES_FLOOR_CAVE_2
+    elseif theme == THEME.VOLCANA then
+        return TEXTURE.DATA_TEXTURES_FLOOR_VOLCANO_2
+    elseif theme == THEME.JUNGLE then
+        return TEXTURE.DATA_TEXTURES_FLOOR_JUNGLE_1
+    elseif theme == THEME.OLMEC then
+        return TEXTURE.DATA_TEXTURES_DECO_JUNGLE_2
+    elseif theme == THEME.TIDE_POOL then
+        return TEXTURE.DATA_TEXTURES_FLOOR_TIDEPOOL_3
+    elseif theme == THEME.TEMPLE then
+        return TEXTURE.DATA_TEXTURES_FLOOR_TEMPLE_1
+    elseif theme == THEME.ICE_CAVES then
+        return TEXTURE.DATA_TEXTURES_FLOOR_ICE_1
+    elseif theme == THEME.NEO_BABYLON then
+        return TEXTURE.DATA_TEXTURES_FLOOR_BABYLON_1
+    elseif theme == THEME.SUNKEN_CITY then
+        return TEXTURE.DATA_TEXTURES_FLOOR_SUNKEN_3
+    elseif theme == THEME.CITY_OF_GOLD then
+        return TEXTURE.DATA_TEXTURES_FLOOR_TEMPLE_4
+    elseif theme == THEME.DUAT then
+        return TEXTURE.DATA_TEXTURES_FLOOR_TEMPLE_1
+    elseif theme == THEME.ABZU then
+        return TEXTURE.DATA_TEXTURES_FLOOR_TIDEPOOL_3
+    elseif theme == THEME.TIAMAT then
+        return TEXTURE.DATA_TEXTURES_FLOOR_TIDEPOOL_3
+    elseif theme == THEME.EGGPLANT_WORLD then
+        return TEXTURE.DATA_TEXTURES_FLOOR_EGGPLANT_2
+    elseif theme == THEME.HUNDUN then
+        return TEXTURE.DATA_TEXTURES_FLOOR_SUNKEN_3
+    elseif theme == THEME.BASE_CAMP then
+        return TEXTURE.DATA_TEXTURES_FLOOR_CAVE_2
+    elseif theme == THEME.ARENA then
+        return TEXTURE.DATA_TEXTURES_FLOOR_CAVE_2
+    elseif theme == THEME.COSMIC_OCEAN then
+        if co_subtheme == COSUBTHEME.DWELLING then
+            return TEXTURE.DATA_TEXTURES_FLOOR_CAVE_2
+        elseif co_subtheme == COSUBTHEME.JUNGLE then
+            return TEXTURE.DATA_TEXTURES_FLOOR_JUNGLE_1
+        elseif co_subtheme == COSUBTHEME.VOLCANA then
+            return TEXTURE.DATA_TEXTURES_FLOOR_VOLCANO_2
+        elseif co_subtheme == COSUBTHEME.TIDE_POOL then
+            return TEXTURE.DATA_TEXTURES_FLOOR_TIDEPOOL_3
+        elseif co_subtheme == COSUBTHEME.TEMPLE then
+            return TEXTURE.DATA_TEXTURES_FLOOR_TEMPLE_1
+        elseif co_subtheme == COSUBTHEME.ICE_CAVES then
+            return TEXTURE.DATA_TEXTURES_FLOOR_ICE_1
+        elseif co_subtheme == COSUBTHEME.NEO_BABYLON then
+            return TEXTURE.DATA_TEXTURES_FLOOR_BABYLON_1
+        elseif co_subtheme == COSUBTHEME.SUNKEN_CITY then
+            return TEXTURE.DATA_TEXTURES_FLOOR_SUNKEN_3
+        end
+    end
+    return TEXTURE.DATA_TEXTURES_FLOOR_CAVE_2
+end
+
+local function texture_for_level(level)
+    return texture_for_theme(level.theme, level.co_subtheme)
+end
+
+local main_exits = {}
+local shortcuts = {}
+local continue_door = nil
 set_callback(function()	-- Replace the main entrance door with a door that leads to the first level (Dwelling).
-    local entrance_uids = get_entities_by_type(ENT_TYPE.FLOOR_DOOR_STARTING_EXIT)
+    local entrance_uids = get_entities_by_type(ENT_TYPE.FLOOR_DOOR_MAIN_EXIT)
+    main_exits = {}
     if #entrance_uids > 0 then
         local entrance_uid = entrance_uids[1]
 		local first_level = sequence_state.levels[1]
-        kill_entity(entrance_uid)
-        spawn_door(
-			42,
-			84,
-			LAYER.FRONT,
+        -- kill_entity(entrance_uid)
+        local x, y, layer = get_position(entrance_uid)
+        local entrance = get_entity(entrance_uid)
+        entrance.flags = clr_flag(entrance.flags, ENT_FLAG.ENABLE_BUTTON_PROMPT)
+        local door = spawn_door(
+			x,
+			y,
+			layer,
 			world_for_level(first_level),
 			level_for_level(first_level),
 			first_level.theme)
+        main_exits[#main_exits+1] = get_entity(door)
     end
 end, ON.CAMP)
+
+set_callback(function()
+    main_exits = {}
+    shortcuts = {}
+    continue_door = nil
+end, ON.LEVEL)
+
+local function update_main_exits()
+    local first_level = sequence_state.levels[1]
+    for _, main_exit in pairs(main_exits) do
+        main_exit.world = world_for_level(first_level)
+        main_exit.level = level_for_level(first_level)
+        main_exit.theme = first_level.theme
+    end
+end
+level_sequence.update_main_exits = update_main_exits
+
+local SIGN_TYPE = {
+    NONE = 0,
+    LEFT = 1,
+    RIGHT = 2,
+}
+level_sequence.SIGN_TYPE = SIGN_TYPE
+
+level_sequence.spawn_shortcut = function(x, y, layer, level, include_sign, sign_text)
+    include_sign = include_sign or SIGN_TYPE.NONE
+    local background_uid = spawn_entity(ENT_TYPE.BG_DOOR, x, y+.25, layer, 0, 0)
+    local door_uid = spawn_door(x, y, layer, world_for_level(level), level_for_level(level), level.theme)
+    local door = get_entity(door_uid)
+    local background = get_entity(background_uid)
+    background:set_texture(texture_for_level(level))
+    background.animation_frame = set_flag(background.animation_frame, 1)
+
+    local sign
+    local tv
+    if include_sign ~= SIGN_TYPE.NONE then
+        local sign_position_x = x
+        if include_sign == SIGN_TYPE.LEFT then
+            sign_position_x = x - 2
+        elseif include_sign == SIGN_TYPE.RIGHT then
+            sign_position_x = x + 2
+        end
+        local sign_uid = spawn_entity(ENT_TYPE.ITEM_SPEEDRUN_SIGN, sign_position_x, y, layer, 0, 0)
+        sign = get_entity(sign_uid)
+        -- This stops the sign from displaying its default toast text when pressing the door button.
+        sign.flags = clr_flag(sign.flags, ENT_FLAG.ENABLE_BUTTON_PROMPT)
+        local tv_uid = button_prompts.spawn_button_prompt(button_prompts.PROMPT_TYPE.VIEW, sign_position_x, y, layer)
+        tv = get_entity(tv_uid)
+    end
+    local shortcut = {
+        level = level,
+        door = door,
+        sign = sign,
+        sign_text = sign_text or f'Shortcut to {level.title}',
+    }
+    local destroyed = false
+    shortcut.destroy = function()
+        if destroyed then return end
+        destroyed = true
+        door:destroy()
+        background:destroy()
+        if sign then
+            sign:destroy()
+        end
+        if tv then
+            tv:destroy()
+        end
+
+        local new_shortcuts = {}
+        for _, new_shortcut in pairs(shortcuts) do
+            if new_shortcut ~= shortcut then
+                new_shortcuts[#new_shortcuts+1] = new_shortcut
+            end
+        end
+        shortcuts = new_shortcuts
+    end
+    shortcuts[#shortcuts+1] = shortcut
+    return shortcut
+end
+
+level_sequence.spawn_continue_door = function(x, y, layer, level, attempts, time, include_sign, sign_text, disabled_sign_text, no_run_sign_text)
+    include_sign = include_sign or SIGN_TYPE.NONE
+    local background_uid = spawn_entity(ENT_TYPE.BG_DOOR, x, y+.25, layer, 0, 0)
+    local door_uid = spawn_door(x, y, layer, world_for_level(level), level_for_level(level), level.theme)
+    local door = get_entity(door_uid)
+    local background = get_entity(background_uid)
+    background.animation_frame = set_flag(background.animation_frame, 1)
+    
+    local function update_door_for_level(level)
+        background:set_texture(texture_for_level(level))
+        if not level or not sequence_state.keep_progress then
+            door.flags = clr_flag(door.flags, ENT_FLAG.ENABLE_BUTTON_PROMPT)
+        else
+            door.flags = set_flag(door.flags, ENT_FLAG.ENABLE_BUTTON_PROMPT)
+        end
+        door.world = world_for_level(level)
+        door.level = level_for_level(level)
+        door.theme = level.theme
+    end
+
+    update_door_for_level(level)
+
+    local sign
+    local tv
+    if include_sign ~= SIGN_TYPE.NONE then
+        local sign_position_x = x
+        if include_sign == SIGN_TYPE.LEFT then
+            sign_position_x = x - 2
+        elseif include_sign == SIGN_TYPE.RIGHT then
+            sign_position_x = x + 2
+        end
+        local sign_uid = spawn_entity(ENT_TYPE.ITEM_SPEEDRUN_SIGN, sign_position_x, y, layer, 0, 0)
+        sign = get_entity(sign_uid)
+        -- This stops the sign from displaying its default toast text when pressing the door button.
+        sign.flags = clr_flag(sign.flags, ENT_FLAG.ENABLE_BUTTON_PROMPT)
+        local tv_uid = button_prompts.spawn_button_prompt(button_prompts.PROMPT_TYPE.VIEW, sign_position_x, y, layer)
+        tv = get_entity(tv_uid)
+    end
+    continue_door = {
+        level = level,
+        attempts = attempts,
+        time = time,
+        door = door,
+        sign = sign,
+        sign_text = sign_text,
+        disabled_sign_text = disabled_sign_text,
+        no_run_sign_text = no_run_sign_text,
+    }
+    continue_door.update_door = function(level, attempts, time, sign_text, disabled_sign_text, no_run_sign_text)
+        continue_door.level = level
+        continue_door.attempts = attempts
+        continue_door.time = time
+        continue_door.sign_text = sign_text
+        continue_door.disabled_sign_text = disabled_sign_text
+        continue_door.no_run_sign_text = no_run_sign_text
+        update_door_for_level(level)
+    end
+    local destroyed = false
+    continue_door.destroy = function()
+        if destroyed then return end
+        destroyed = true
+        door:destroy()
+        background:destroy()
+        if sign then
+            sign:destroy()
+        end
+        if tv then
+            tv:destroy()
+        end
+        continue_door = nil
+    end
+    return continue_door
+end
+
+
+set_callback(function()
+    if #players < 1 then return end
+    if state.theme ~= THEME.BASE_CAMP then return end
+    local player = players[1]
+    for _, shortcut in pairs(shortcuts) do
+        if (shortcut.door and distance(player.uid, shortcut.door.uid) <= 1) or 
+                (shortcut.sign and distance(player.uid, shortcut.sign.uid) <= 1) then
+            level_sequence.load_shortcut(shortcut.level)
+            if sequence_state.on_prepare_level then
+                sequence_state.on_prepare_level(shortcut.level, false)
+            end
+            return
+        end
+    end
+    if continue_door ~= nil and
+            continue_door.level ~= nil and
+            sequence_state.keep_progress and
+            ((continue_door.door and distance(player.uid, continue_door.door.uid) <= 1) or
+             (continue_door.sign and distance(player.uid, continue_door.sign.uid) <= 1)) then
+        level_sequence.load_run(continue_door.level, continue_door.attempts, continue_door.time)
+        if sequence_state.on_prepare_level then
+            sequence_state.on_prepare_level(continue_door.level, true)
+        end
+        return
+    end
+    -- If not next to any door, just set the state to the initial level. 
+    level_sequence.load_shortcut(sequence_state.levels[1])
+    if sequence_state.on_prepare_level then
+        sequence_state.on_prepare_level(sequence_state.levels[1], false)
+    end
+end, ON.GAMEFRAME)
+
+set_callback(function()
+    if state.theme ~= THEME.BASE_CAMP then return end
+    if #players < 1 then return end
+    local player = players[1]
+
+	-- Show a toast when pressing the door button on the signs near shortcut doors and continue door.
+    if player:is_button_pressed(BUTTON.DOOR) then
+        for _, shortcut in pairs(shortcuts) do
+            if shortcut.sign and
+                    player.layer == shortcut.sign.layer and
+                    distance(player.uid, shortcut.sign.uid) <= 0.5 then
+                toast(shortcut.sign_text)
+            end
+        end
+        if continue_door and
+                continue_door.sign and
+                player.layer == continue_door.sign.layer and
+                distance(player.uid, continue_door.sign.uid) <= 0.5 then
+            if not sequence_state.keep_progress then
+                toast(continue_door.disabled_sign_text or "Cannot continue in hardcore mode")
+            elseif continue_door.level then
+                toast(continue_door.sign_text or f'Continue run from {continue_door.level.title}')
+            else
+                toast(continue_door.no_run_sign_text or "No run to continue")
+            end
+        elseif continue_door and
+                continue_door.door and
+                not continue_door.level and
+                player.layer == continue_door.door.layer and
+                distance(player.uid, continue_door.door.uid) <= 0.5 then
+            toast(continue_door.no_run_sign_text or "No run to continue")
+        elseif continue_door and
+                continue_door.door and
+                not sequence_state.keep_progress and
+                player.layer == continue_door.door.layer and
+                distance(player.uid, continue_door.door.uid) <= 0.5 then
+            toast(continue_door.disabled_sign_text or "Cannot continue in hardcore mode")
+        end
+    end
+end, ON.GAMEFRAME)
+
+level_sequence.set_on_prepare_level = function(on_prepare_level)
+    sequence_state.on_prepare_level = on_prepare_level
+end
 
 ---------------
 ---- /CAMP ----
 ---------------
+
+-- Allow clients to interact with copies of the level list so that they cannot rearrange, add,
+-- or remove levels without going through these methods.
+level_sequence.levels = function()
+    local levels = {}
+    for index, level in pairs(sequence_state.levels) do
+        levels[index] = level
+    end
+    return levels
+end
+
+level_sequence.set_levels = function(levels)
+    local new_levels = {}
+    for index, level in pairs(levels) do
+        new_levels[index] = level
+    end
+
+    -- Make sure to only update the levels while not in a run.
+    if state.theme == THEME.BASE_CAMP or state.theme == 0 then
+        sequence_state.levels = new_levels
+        sequence_state.buffered_levels = nil
+        update_main_exits()
+    else
+        sequence_state.buffered_levels  = new_levels
+    end
+end
+
+-- If the levels were updated while on a run, apply the changes when entering the camp.
+set_callback(function()
+    if sequence_state.buffered_levels then
+        sequence_state.levels = sequence_state.buffered_levels
+        sequence_state.buffered_levels = nil
+        update_main_exits()
+    end
+end, ON.CAMP)
 
 return level_sequence
