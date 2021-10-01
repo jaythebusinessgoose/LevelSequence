@@ -8,15 +8,56 @@ local sequence_state = {
     levels = {},
     buffered_levels = {},
     keep_progress = true,
-
-    level_will_unload_callback = nil,
-    level_will_load_callback = nil,
-    post_level_generation_callback = nil,
-    reset_run_callback = nil,
-    on_completed_level = nil,
-    on_win = nil,
-    on_prepare_level = nil,
 }
+
+local sequence_callbacks = {
+    -- Called during level gen just before unloading the previous level.
+    on_level_will_unload = nil,
+    -- Called during level gen just before loading the current level.
+    on_level_will_load = nil,
+    -- Called during post level generation, after the level state has been configured.
+    on_post_level_generation = nil,
+    -- Called when resetting the run if keep progress is not enabled.
+    reset_run_callback = nil,
+    -- Called in the transition after a level has been completed.
+    on_completed_level = nil,
+    -- Called in the transition after the last level has been completed.
+    on_win = nil,
+    -- Called in the base camp when the initial level is updated.
+    on_prepare_initial_level = nil,
+}
+
+-- Set the callback that will be called just before unloading a level. The callback signature
+-- takes one parameter -- the level that will be unloaded.
+level_sequence.set_on_level_will_unload = function(callback)
+    sequence_callbacks.on_level_will_unload = callback
+end
+
+-- Set the callback that will be called just before loading a level. The callback signature
+-- takes one parameter -- the level that will be loaded.
+level_sequence.set_on_level_will_load = function(callback)
+    sequence_callbacks.on_level_will_load = callback
+end
+
+level_sequence.set_on_post_level_generation = function(on_post_level_generation)
+    sequence_callbacks.on_post_level_generation = on_post_level_generation
+end
+
+level_sequence.set_on_reset_run = function(on_reset_run)
+    sequence_callbacks.on_reset_run = on_reset_run
+end
+
+level_sequence.set_on_completed_level = function(on_completed_level)
+    sequence_callbacks.on_completed_level = on_completed_level
+end
+
+level_sequence.set_on_win = function(on_win)
+    sequence_callbacks.on_win = on_win
+end
+
+level_sequence.set_on_prepare_initial_level = function(on_prepare_initial_level)
+    sequence_callbacks.on_prepare_initial_level = on_prepare_initial_level
+end
 
 local internal_callbacks = {
     entrance_tile_code_callback = nil,
@@ -46,11 +87,6 @@ end
 level_sequence.set_keep_progress = function(keep_progress)
     sequence_state.keep_progress = keep_progress
 end
-
-level_sequence.set_reset_run_callback = function(reset_run_callback)
-    sequence_state.reset_run_callback = reset_run_callback
-end
-
 local function equal_levels(level_1, level_2)
     if not level_1 or not level_2 then return end
     return level_1 == level_2 or (level_1.identifier ~= nil and level_1.identifier == level_2.identifier)
@@ -144,23 +180,11 @@ end
 ---- LEVEL GENERATION ----
 --------------------------
 
--- Set the callback that will be called just before unloading a level. The callback signature
--- takes one parameter -- the level that will be unloaded.
-level_sequence.set_level_will_unload_callback = function(callback)
-    sequence_state.level_will_unload_callback = callback
-end
-
--- Set the callback that will be called just before loading a level. The callback signature
--- takes one parameter -- the level that will be loaded.
-level_sequence.set_level_will_load_callback = function(callback)
-    sequence_state.level_will_load_callback = callback
-end
-
 local loaded_level = nil
 local function load_level(level, ctx)
 	if loaded_level then
-        if sequence_state.level_will_unload_callback then
-            sequence_state.level_will_unload_callback(loaded_level)
+        if sequence_callbacks.on_level_will_unload then
+            sequence_callbacks.on_level_will_unload(loaded_level)
         end
 		loaded_level.unload_level()
 		custom_levels.unload_level()
@@ -169,8 +193,8 @@ local function load_level(level, ctx)
     loaded_level = level
 	if not loaded_level then return end
 
-    if sequence_state.level_will_load_callback then
-        sequence_state.level_will_load_callback(loaded_level)
+    if sequence_callbacks.on_level_will_load then
+        sequence_callbacks.on_level_will_load(loaded_level)
     end
 	loaded_level.load_level()
 	custom_levels.load_level(level.file_name, level.width, level.height, ctx)
@@ -216,22 +240,14 @@ end
 ---- LEVEL TRANSITIONS ----
 ---------------------------
 
-level_sequence.set_on_completed_level = function(on_completed_level)
-    sequence_state.on_completed_level = on_completed_level
-end
-
-level_sequence.set_on_win = function(on_win)
-    sequence_state.on_win = on_win
-end
-
 set_callback(function()
     local previous_level = run_state.current_level
     run_state.current_level = next_level()
-    if sequence_state.on_completed_level then
-        sequence_state.on_completed_level(previous_level, run_state.current_level, run_state.initial_level)
+    if sequence_callbacks.on_completed_level then
+        sequence_callbacks.on_completed_level(previous_level, run_state.current_level, run_state.initial_level)
     end
     if not run_state.current_level then
-        if sequence_state.on_win then
+        if sequence_callbacks.on_win then
             run_state.run_started = false
             sequence.state.on_win(run_state.attempts, state.time_total, run_state.initial_level)
         end
@@ -289,27 +305,19 @@ end, ON.CAMP)
 -- Reset the run state if the game is reset and keep progress is not enabled.
 set_callback(function()
     if not sequence_state.keep_progress then
-        if sequence_state.reset_run_callback then
-            sequence_state.reset_run_callback()
+        if sequence_callbacks.on_reset_run then
+            sequence_callbacks.on_reset_run()
         end
         run_state.current_level = run_state.initial_level
         run_state.attempts = 0
     end
 end, ON.RESET)
 
-level_sequence.set_post_level_generation_callback = function(post_level_generation_callback)
-    sequence_state.post_level_generation_callback = post_level_generation_callback
-end
-
 set_callback(function()
     if state.theme == THEME.BASE_CAMP then return end
     local current_level = run_state.current_level
     local next_level_file = next_level()
     if not current_level then return end
-
-    if sequence_state.post_level_generation_callback then
-        sequence_state.post_level_generation_callback(current_level)
-    end
     
     -- This doesn't affect anything except what is displayed in the UI.
 	state.world = current_level.world or index_of_level(current_level)
@@ -342,6 +350,10 @@ set_callback(function()
 			end
 		end
 	end
+
+    if sequence_callbacks.on_post_level_generation then
+        sequence_callbacks.on_post_level_generation(current_level)
+    end
 end, ON.POST_LEVEL_GENERATION)
 
 --------------
@@ -595,8 +607,8 @@ set_callback(function()
         if (shortcut.door and distance(player.uid, shortcut.door.uid) <= 1) or 
                 (shortcut.sign and distance(player.uid, shortcut.sign.uid) <= 1) then
             level_sequence.load_shortcut(shortcut.level)
-            if sequence_state.on_prepare_level then
-                sequence_state.on_prepare_level(shortcut.level, false)
+            if sequence_callbacks.on_prepare_initial_level then
+                sequence_callbacks.on_prepare_initial_level(shortcut.level, false)
             end
             return
         end
@@ -607,15 +619,15 @@ set_callback(function()
             ((continue_door.door and distance(player.uid, continue_door.door.uid) <= 1) or
              (continue_door.sign and distance(player.uid, continue_door.sign.uid) <= 1)) then
         level_sequence.load_run(continue_door.level, continue_door.attempts, continue_door.time)
-        if sequence_state.on_prepare_level then
-            sequence_state.on_prepare_level(continue_door.level, true)
+        if sequence_callbacks.on_prepare_initial_level then
+            sequence_callbacks.on_prepare_initial_level(continue_door.level, true)
         end
         return
     end
     -- If not next to any door, just set the state to the initial level. 
     level_sequence.load_shortcut(sequence_state.levels[1])
-    if sequence_state.on_prepare_level then
-        sequence_state.on_prepare_level(sequence_state.levels[1], false)
+    if sequence_callbacks.on_prepare_initial_level then
+        sequence_callbacks.on_prepare_initial_level(sequence_state.levels[1], false)
     end
 end, ON.GAMEFRAME)
 
@@ -659,10 +671,6 @@ set_callback(function()
         end
     end
 end, ON.GAMEFRAME)
-
-level_sequence.set_on_prepare_level = function(on_prepare_level)
-    sequence_state.on_prepare_level = on_prepare_level
-end
 
 ---------------
 ---- /CAMP ----
