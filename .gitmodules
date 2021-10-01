@@ -1,3 +1,6 @@
 [submodule "CustomLevels"]
 	path = CustomLevels
 	url = https://github.com/jaythebusinessgoose/CustomLevels
+[submodule "ButtonPrompts"]
+	path = ButtonPrompts
+	url = https://github.com/jaythebusinessgoose/ButtonPrompts
