@@ -596,7 +596,7 @@ end
 
 local main_exits = {}
 local shortcuts = {}
-local continue_door = nil
+local continue_doors = {}
 -- Replace the main entrance door with a door that leads to the first level to begin the run.
 local function replace_main_entrance()
     local entrance_uids = get_entities_by_type(ENT_TYPE.FLOOR_DOOR_MAIN_EXIT)
@@ -622,7 +622,7 @@ end
 local function reset_camp_doors()
     main_exits = {}
     shortcuts = {}
-    continue_door = nil
+    continue_doors = {}
 end
 
 -- Updates the main entrance to lead to the current first level in the state. This is
@@ -801,7 +801,7 @@ level_sequence.spawn_continue_door = function(
         local tv_uid = button_prompts.spawn_button_prompt(button_prompts.PROMPT_TYPE.VIEW, sign_position_x, y, layer)
         tv = get_entity(tv_uid)
     end
-    continue_door = {
+    local continue_door = {
         level = level,
         attempts = attempts,
         time = time,
@@ -832,8 +832,16 @@ level_sequence.spawn_continue_door = function(
         if tv then
             tv:destroy()
         end
-        continue_door = nil
+
+        local new_doors = {}
+        for _, new_door in pairs(continue_doors) do
+            if new_door ~= continue_door then
+                new_doors[#new_doors+1] = new_door
+            end
+        end
+        continue_doors = new_doors
     end
+    continue_doors[#continue_doors+1] = continue_door
     return continue_door
 end
 
@@ -853,16 +861,17 @@ local function update_current_entry()
             return
         end
     end
-    if continue_door ~= nil and
-            continue_door.level ~= nil and
-            sequence_state.keep_progress and
-            ((continue_door.door and distance(player.uid, continue_door.door.uid) <= 1) or
-             (continue_door.sign and distance(player.uid, continue_door.sign.uid) <= 1)) then
-        load_run(continue_door.level, continue_door.attempts, continue_door.time)
-        if sequence_callbacks.on_prepare_initial_level then
-            sequence_callbacks.on_prepare_initial_level(continue_door.level, true)
+    for _, continue_door in pairs(continue_doors) do
+        if continue_door.level ~= nil and
+                sequence_state.keep_progress and
+                ((continue_door.door and distance(player.uid, continue_door.door.uid) <= 1) or
+                 (continue_door.sign and distance(player.uid, continue_door.sign.uid) <= 1)) then
+            load_run(continue_door.level, continue_door.attempts, continue_door.time)
+            if sequence_callbacks.on_prepare_initial_level then
+                sequence_callbacks.on_prepare_initial_level(continue_door.level, true)
+            end
+            return
         end
-        return
     end
     -- If not next to any door, just set the state to the initial level. 
     load_shortcut(sequence_state.levels[1])
@@ -887,29 +896,28 @@ local function handle_sign_toasts()
                 toast(shortcut.sign_text)
             end
         end
-        if continue_door and
-                continue_door.sign and
-                player.layer == continue_door.sign.layer and
-                distance(player.uid, continue_door.sign.uid) <= 0.5 then
-            if not sequence_state.keep_progress then
-                toast(continue_door.disabled_sign_text or "Cannot continue in hardcore mode")
-            elseif continue_door.level then
-                toast(continue_door.sign_text or f'Continue run from {continue_door.level.title}')
-            else
+        for _, continue_door in pairs(continue_doors) do
+            if continue_door.sign and
+                    player.layer == continue_door.sign.layer and
+                    distance(player.uid, continue_door.sign.uid) <= 0.5 then
+                if not sequence_state.keep_progress then
+                    toast(continue_door.disabled_sign_text or "Cannot continue in hardcore mode")
+                elseif continue_door.level then
+                    toast(continue_door.sign_text or f'Continue run from {continue_door.level.title}')
+                else
+                    toast(continue_door.no_run_sign_text or "No run to continue")
+                end
+            elseif continue_door.door and
+                    not continue_door.level and
+                    player.layer == continue_door.door.layer and
+                    distance(player.uid, continue_door.door.uid) <= 0.5 then
                 toast(continue_door.no_run_sign_text or "No run to continue")
+            elseif continue_door.door and
+                    not sequence_state.keep_progress and
+                    player.layer == continue_door.door.layer and
+                    distance(player.uid, continue_door.door.uid) <= 0.5 then
+                toast(continue_door.disabled_sign_text or "Cannot continue in hardcore mode")
             end
-        elseif continue_door and
-                continue_door.door and
-                not continue_door.level and
-                player.layer == continue_door.door.layer and
-                distance(player.uid, continue_door.door.uid) <= 0.5 then
-            toast(continue_door.no_run_sign_text or "No run to continue")
-        elseif continue_door and
-                continue_door.door and
-                not sequence_state.keep_progress and
-                player.layer == continue_door.door.layer and
-                distance(player.uid, continue_door.door.uid) <= 0.5 then
-            toast(continue_door.disabled_sign_text or "Cannot continue in hardcore mode")
         end
     end
 end
