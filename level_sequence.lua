@@ -566,21 +566,20 @@ end
 ---- /TIME SYNCHRONIZATION
 --------------------------------------
 
---------------
----- CAMP ----
---------------
-
+--------------------------------------
+---- CAMP
+--------------------------------------
 
 local main_exits = {}
 local shortcuts = {}
 local continue_door = nil
-set_callback(function()	-- Replace the main entrance door with a door that leads to the first level (Dwelling).
+-- Replace the main entrance door with a door that leads to the first level to begin the run.
+local function replace_main_entrance()
     local entrance_uids = get_entities_by_type(ENT_TYPE.FLOOR_DOOR_MAIN_EXIT)
     main_exits = {}
     if #entrance_uids > 0 then
         local entrance_uid = entrance_uids[1]
 		local first_level = sequence_state.levels[1]
-        -- kill_entity(entrance_uid)
         local x, y, layer = get_position(entrance_uid)
         local entrance = get_entity(entrance_uid)
         entrance.flags = clr_flag(entrance.flags, ENT_FLAG.ENABLE_BUTTON_PROMPT)
@@ -593,14 +592,17 @@ set_callback(function()	-- Replace the main entrance door with a door that leads
 			first_level.theme)
         main_exits[#main_exits+1] = get_entity(door)
     end
-end, ON.CAMP)
+end
 
-set_callback(function()
+-- Clear the tracked doors in the camp for different shortcut and main entrances.
+local function reset_camp_doors()
     main_exits = {}
     shortcuts = {}
     continue_door = nil
-end, ON.LEVEL)
+end
 
+-- Updates the main entrance to lead to the current first level in the state. This is
+-- called when the levels are updated.
 local function update_main_exits()
     local first_level = sequence_state.levels[1]
     for _, main_exit in pairs(main_exits) do
@@ -609,8 +611,12 @@ local function update_main_exits()
         main_exit.theme = first_level.theme
     end
 end
-level_sequence.update_main_exits = update_main_exits
 
+-- Where to spawn a sign in relation to shortcut doors.
+--
+-- NONE: Do not spawn any sign at all.
+-- LEFT: Spawn a sign two tiles to the left of the door.
+-- RIGHT: Spawn a sign two tiles to the right of the door.
 local SIGN_TYPE = {
     NONE = 0,
     LEFT = 1,
@@ -618,6 +624,24 @@ local SIGN_TYPE = {
 }
 level_sequence.SIGN_TYPE = SIGN_TYPE
 
+-- Spawn a door that will act as a shortcut to a specific level.
+--
+-- x: x position that the door will spawn at.
+-- y: y position that the door will spawn at.
+-- layer: Layer that the door will spawn at.
+-- level: Level that the door will lead to when entered.
+-- include_sign: (optional) SIGN_TYPE enum. SIGN_TYPE.NONE to not include any sign. SIGN_TYPE.LEFT
+--               to include a sign to the left of the door. SIGN_TYPE.RIGHT to include a sign to the
+--               right of the door. The sign will pop up a toast with either the level name or sign_text.
+--               Defaults to SIGN_TYPE.NONE if not set and does not display a sign.
+-- sign_text: (optional) Text displayed when the interact button is pressed. If not set, will default
+--            to displaying "Shortcut to level.title".
+-- Return: A shortcut object with data for the shortcut that was spawned:
+--           level: The level the shorcut leads to.
+--           door: The door that was spawned to start the shortcut.
+--           sign: The sign that was spawned to display information about the shortcut.
+--           sign_text: The text that will be displayed when interacting with the sign.
+--           destroy(): Method that can be called to remove the shortcut.
 level_sequence.spawn_shortcut = function(x, y, layer, level, include_sign, sign_text)
     include_sign = include_sign or SIGN_TYPE.NONE
     local background_uid = spawn_entity(ENT_TYPE.BG_DOOR, x, y+.25, layer, 0, 0)
@@ -674,7 +698,48 @@ level_sequence.spawn_shortcut = function(x, y, layer, level, include_sign, sign_
     return shortcut
 end
 
-level_sequence.spawn_continue_door = function(x, y, layer, level, attempts, time, include_sign, sign_text, disabled_sign_text, no_run_sign_text)
+
+-- Spawn a door that can be entered to continue an ongoing run.
+--
+-- x: x position that the door will spawn at.
+-- y: y position that the door will spawn at.
+-- layer: Layer that the door will spawn at.
+-- level: Level that the door will lead to when entered.
+-- attempts: Number of attempts in the run that will be continued.
+-- time: Total amount of time spent on the continued run.
+-- include_sign: (optional) SIGN_TYPE enum. SIGN_TYPE.NONE to not include any sign. SIGN_TYPE.LEFT
+--               to include a sign to the left of the door. SIGN_TYPE.RIGHT to include a sign to the
+--               right of the door. The sign will pop up a toast with either the level name or sign_text.
+--               Defaults to SIGN_TYPE.NONE if not set and does not display a sign.
+-- sign_text: (optional) Text displayed when the interact button is pressed. If not set, will default
+--            to displaying "Continue run from level.title".
+-- disabled_sign_text: (optional) Text displayed when the interact button is pressed if continuing runs
+--                     is disbled due to keep_progress being disabled. If not set, will default to
+--                     displaying "Cannot continue in hardcore mode".
+-- no_run_sign_text: (optional) Text displayed when the interact button is pressed if continuing runs
+--                   is enabled, but there is no saved run to load from. If not set, will default to
+--                   displaying "No run to continue"
+-- Return: A shortcut object with data for the shortcut that was spawned:
+--           level: The level the shorcut leads to.
+--           attempts: Number of attempts that the run is on if entering the door.
+--           time: Total time the run will be set to when continuing through the door.
+--           door: The door that was spawned to continue the run.
+--           sign: The sign that was spawned to display information about the run.
+--           sign_text: The text that will be displayed when interacting with the sign.
+--           disabled_sign_text: The text that will be displayed if continuing is disabled.
+--           no_run_sign_text: The text that will be displayed if there is no run to continue.
+--           destroy(): Method that can be called to remove the door.
+level_sequence.spawn_continue_door = function(
+        x,
+        y,
+        layer,
+        level,
+        attempts,
+        time,
+        include_sign,
+        sign_text,
+        disabled_sign_text,
+        no_run_sign_text)
     include_sign = include_sign or SIGN_TYPE.NONE
     local background_uid = spawn_entity(ENT_TYPE.BG_DOOR, x, y+.25, layer, 0, 0)
     local door_uid = spawn_door(x, y, layer, world_for_level(level), level_for_level(level), level.theme)
@@ -748,8 +813,9 @@ level_sequence.spawn_continue_door = function(x, y, layer, level, attempts, time
     return continue_door
 end
 
-
-set_callback(function()
+-- Updates the current level that will be loaded upon entering a door. Updates the level when within
+-- a 1-block radius of either the door or the sign.
+local function update_current_entry()
     if #players < 1 then return end
     if state.theme ~= THEME.BASE_CAMP then return end
     local player = players[1]
@@ -779,9 +845,11 @@ set_callback(function()
     if sequence_callbacks.on_prepare_initial_level then
         sequence_callbacks.on_prepare_initial_level(sequence_state.levels[1], false)
     end
-end, ON.GAMEFRAME)
+end
 
-set_callback(function()
+-- Called on every GAMEFRAME, displays a toast if the player presses the door button while standing
+-- next to a shortcut sign.
+local function handle_sign_toasts()
     if state.theme ~= THEME.BASE_CAMP then return end
     if #players < 1 then return end
     local player = players[1]
@@ -820,14 +888,20 @@ set_callback(function()
             toast(continue_door.disabled_sign_text or "Cannot continue in hardcore mode")
         end
     end
-end, ON.GAMEFRAME)
+end
 
----------------
----- /CAMP ----
----------------
+--------------------------------------
+---- /CAMP
+--------------------------------------
+
+--------------------------------------
+---- LEVEL STATE
+--------------------------------------
 
 -- Allow clients to interact with copies of the level list so that they cannot rearrange, add,
 -- or remove levels without going through these methods.
+--
+-- Return: Copy of the current loaded levels.
 level_sequence.levels = function()
     local levels = {}
     for index, level in pairs(sequence_state.levels) do
@@ -836,6 +910,8 @@ level_sequence.levels = function()
     return levels
 end
 
+-- Set the levels that will be loaded. If currently in a run, the actual level state will not
+-- be updated until back in the camp.
 level_sequence.set_levels = function(levels)
     local new_levels = {}
     for index, level in pairs(levels) do
@@ -853,13 +929,17 @@ level_sequence.set_levels = function(levels)
 end
 
 -- If the levels were updated while on a run, apply the changes when entering the camp.
-set_callback(function()
+local function convert_buffered_levels()
     if sequence_state.buffered_levels then
         sequence_state.levels = sequence_state.buffered_levels
         sequence_state.buffered_levels = nil
         update_main_exits()
     end
-end, ON.CAMP)
+end
+
+--------------------------------------
+---- /LEVEL STATE
+--------------------------------------
 
 --------------------------------------
 ---- STATE CALLBACKS
@@ -883,6 +963,11 @@ level_sequence.activate = function()
     add_callback(set_callback(reset_on_camp_callback, ON.CAMP))
     add_callback(set_callback(reset_run_if_hardcore, ON.RESET))
     add_callback(set_callback(update_state_and_doors, ON.POST_LEVEL_GENERATION))
+    add_callback(set_callback(reset_camp_doors, ON.LEVEL))
+    add_callback(set_callback(replace_main_entrance, ON.CAMP))
+    add_callback(set_callback(handle_sign_toasts, ON.GAMEFRAME))
+    add_callback(set_callback(update_current_entry, ON.GAMEFRAME))
+    set_callback(convert_buffered_levels, ON.CAMP)
 end
 
 level_sequence.deactivate = function()
