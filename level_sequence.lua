@@ -6,9 +6,17 @@ local level_sequence = {}
 
 local sequence_state = {
     levels = {},
+    -- Stores the desired levels if changed while not in the camp. Will set levels with
+    -- these upon entering camp.
     buffered_levels = {},
+    -- Whether each level acts as a checkpoint. If false, the run will reset on the first level
+    -- upon each death/reset.
     keep_progress = true,
 }
+
+--------------------------------------
+---- CALLBACKS
+--------------------------------------
 
 local sequence_callbacks = {
     -- Called during level gen just before unloading the previous level.
@@ -18,7 +26,7 @@ local sequence_callbacks = {
     -- Called during post level generation, after the level state has been configured.
     on_post_level_generation = nil,
     -- Called when resetting the run if keep progress is not enabled.
-    reset_run_callback = nil,
+    on_reset_run = nil,
     -- Called in the transition after a level has been completed.
     on_completed_level = nil,
     -- Called in the transition after the last level has been completed.
@@ -27,37 +35,69 @@ local sequence_callbacks = {
     on_prepare_initial_level = nil,
 }
 
--- Set the callback that will be called just before unloading a level. The callback signature
--- takes one parameter -- the level that will be unloaded.
+-- Set the callback that will be called just before unloading a level.
+--
+-- Callback signature:
+--   level: Level that will be unloaded
 level_sequence.set_on_level_will_unload = function(callback)
     sequence_callbacks.on_level_will_unload = callback
 end
 
--- Set the callback that will be called just before loading a level. The callback signature
--- takes one parameter -- the level that will be loaded.
+-- Set the callback that will be called just before loading a level.
+--
+-- Callback signature:
+--   level: Level that will be loaded
 level_sequence.set_on_level_will_load = function(callback)
     sequence_callbacks.on_level_will_load = callback
 end
 
+-- Set the callback that will be called on POST_LEVEL_GENERATION just after the level and
+-- doors have been configured.
+--
+-- Callback signature:
+--   level: Level that is currently loaded.
 level_sequence.set_on_post_level_generation = function(on_post_level_generation)
     sequence_callbacks.on_post_level_generation = on_post_level_generation
 end
 
+-- Set the callback that will be called when the run is reset back to the first level.
+-- This callback will never be called if keep_progress is true.
 level_sequence.set_on_reset_run = function(on_reset_run)
     sequence_callbacks.on_reset_run = on_reset_run
 end
 
+-- Set the callback that will be called when a level is completed.
+--
+-- Callback signature:
+--   completed_level: The level that was just completed.
+--   next_level: The level that will be loaded next.
 level_sequence.set_on_completed_level = function(on_completed_level)
     sequence_callbacks.on_completed_level = on_completed_level
 end
 
+-- Set the callback that will be called when the final level is completed.
+--
+-- Callback signature:
+--   attempts: Number of attempts that it took to complete the sequence. Each reset/game exit counts
+--             towards the attempt counter.
+--   time: Total amount of time it took to complete all levels.
 level_sequence.set_on_win = function(on_win)
     sequence_callbacks.on_win = on_win
 end
 
+-- Set the callback that will be called in the camp to change the initial level when
+-- walking near a shortcut door or the continue run door.
+--
+-- Callback signature:
+--   level: Initial level that will be loaded when going through an entrance door.
+--   continuing_run: True if going through the continue door. Otherwise, false.
 level_sequence.set_on_prepare_initial_level = function(on_prepare_initial_level)
     sequence_callbacks.on_prepare_initial_level = on_prepare_initial_level
 end
+
+--------------------------------------
+---- /CALLBACKS
+--------------------------------------
 
 local internal_callbacks = {
     entrance_tile_code_callback = nil,
@@ -255,12 +295,12 @@ set_callback(function()
     local current_level = next_level()
     run_state.current_level = current_level
     if sequence_callbacks.on_completed_level then
-        sequence_callbacks.on_completed_level(previous_level, current_level, run_state.initial_level)
+        sequence_callbacks.on_completed_level(previous_level, current_level)
     end
     if not current_level then
         if sequence_callbacks.on_win then
             run_state.run_started = false
-            sequence.state.on_win(run_state.attempts, state.time_total, run_state.initial_level)
+            sequence.state.on_win(run_state.attempts, state.time_total)
         end
     else
         load_co_subtheme(current_level)
@@ -318,11 +358,11 @@ end, ON.CAMP)
 -- Reset the run state if the game is reset and keep progress is not enabled.
 set_callback(function()
     if not sequence_state.keep_progress then
+        run_state.current_level = run_state.initial_level
+        run_state.attempts = 0
         if sequence_callbacks.on_reset_run then
             sequence_callbacks.on_reset_run()
         end
-        run_state.current_level = run_state.initial_level
-        run_state.attempts = 0
     end
 end, ON.RESET)
 
