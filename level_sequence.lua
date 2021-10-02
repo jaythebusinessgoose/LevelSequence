@@ -218,18 +218,26 @@ end, ON.PRE_LOAD_LEVEL_FILES)
 ---- CONTINUE RUN ----
 ----------------------
 
-level_sequence.load_run = function(level, attempts, time)
+local function load_co_subtheme(level)
+    if level.theme == THEME.COSMIC_OCEAN and level.co_subtheme then
+        force_co_subtheme(level.co_subtheme)
+    end
+end
+
+local function load_run(level, attempts, time)
     run_state.initial_level = sequence_state.levels[1]
     run_state.current_level = level
     run_state.attempts = attempts
     run_state.total_time = time
+    load_co_subtheme(level)
 end
 
-level_sequence.load_shortcut = function(level)
+local function load_shortcut(level)
     run_state.current_level = level
     run_state.initial_level = level
     run_state.attempts = 0
     run_state.total_time = 0
+    load_co_subtheme(level)
 end
 
 -----------------------
@@ -242,15 +250,18 @@ end
 
 set_callback(function()
     local previous_level = run_state.current_level
-    run_state.current_level = next_level()
+    local current_level = next_level()
+    run_state.current_level = current_level
     if sequence_callbacks.on_completed_level then
-        sequence_callbacks.on_completed_level(previous_level, run_state.current_level, run_state.initial_level)
+        sequence_callbacks.on_completed_level(previous_level, current_level, run_state.initial_level)
     end
-    if not run_state.current_level then
+    if not current_level then
         if sequence_callbacks.on_win then
             run_state.run_started = false
             sequence.state.on_win(run_state.attempts, state.time_total, run_state.initial_level)
         end
+    else
+        load_co_subtheme(current_level)
     end
 end, ON.TRANSITION)
 
@@ -606,7 +617,7 @@ set_callback(function()
     for _, shortcut in pairs(shortcuts) do
         if (shortcut.door and distance(player.uid, shortcut.door.uid) <= 1) or 
                 (shortcut.sign and distance(player.uid, shortcut.sign.uid) <= 1) then
-            level_sequence.load_shortcut(shortcut.level)
+            load_shortcut(shortcut.level)
             if sequence_callbacks.on_prepare_initial_level then
                 sequence_callbacks.on_prepare_initial_level(shortcut.level, false)
             end
@@ -618,14 +629,14 @@ set_callback(function()
             sequence_state.keep_progress and
             ((continue_door.door and distance(player.uid, continue_door.door.uid) <= 1) or
              (continue_door.sign and distance(player.uid, continue_door.sign.uid) <= 1)) then
-        level_sequence.load_run(continue_door.level, continue_door.attempts, continue_door.time)
+        load_run(continue_door.level, continue_door.attempts, continue_door.time)
         if sequence_callbacks.on_prepare_initial_level then
             sequence_callbacks.on_prepare_initial_level(continue_door.level, true)
         end
         return
     end
     -- If not next to any door, just set the state to the initial level. 
-    level_sequence.load_shortcut(sequence_state.levels[1])
+    load_shortcut(sequence_state.levels[1])
     if sequence_callbacks.on_prepare_initial_level then
         sequence_callbacks.on_prepare_initial_level(sequence_state.levels[1], false)
     end
