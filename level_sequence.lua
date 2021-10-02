@@ -221,6 +221,8 @@ end, ON.PRE_LOAD_LEVEL_FILES)
 local function load_co_subtheme(level)
     if level.theme == THEME.COSMIC_OCEAN and level.co_subtheme then
         force_co_subtheme(level.co_subtheme)
+    else
+        force_co_subtheme(COSUBTHEME.RESET)
     end
 end
 
