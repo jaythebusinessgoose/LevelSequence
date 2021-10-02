@@ -33,6 +33,8 @@ local sequence_callbacks = {
     on_win = nil,
     -- Called in the base camp when the initial level is updated.
     on_prepare_initial_level = nil,
+    -- Called when a level starts.
+    on_level_start = nil,
 }
 
 -- Set the callback that will be called just before unloading a level.
@@ -93,6 +95,15 @@ end
 --   continuing_run: True if going through the continue door. Otherwise, false.
 level_sequence.set_on_prepare_initial_level = function(on_prepare_initial_level)
     sequence_callbacks.on_prepare_initial_level = on_prepare_initial_level
+end
+
+-- Set the callback that will be called each time a level starts. This includes both the first
+-- time the level is encountered and on every reset.
+--
+-- Callback signature:
+--   level: The level that is being started.
+level_sequence.set_on_level_start = function(on_level_start)
+    sequence_callbacks.on_level_start = on_level_start
 end
 
 --------------------------------------
@@ -565,6 +576,9 @@ local function start_level_callback()
     if state.theme == THEME.BASE_CAMP then return end
     run_state.run_started = true
     run_state.attempts = run_state.attempts + 1
+    if sequence_callbacks.on_level_start then
+        sequence_callbacks.on_level_start(run_state.current_level)
+    end
 end
 
 local function reset_on_camp_callback()
