@@ -471,7 +471,6 @@ local function transition_increment_level_callback()
     if not current_level then
         run_state.run_started = false
         if sequence_callbacks.on_win then
-            print(f'sequence: {run_state.attempts}, {run_state.total_time}, {state.time_total}')
             sequence_callbacks.on_win(run_state.attempts, state.time_total)
         end
     else
@@ -565,7 +564,6 @@ end
 
 -- Set the time in the state so it shows up in the player's HUD.
 local function load_time_after_level_generation_callback()
-    print(inspect(run_state))
     if state.theme == THEME.BASE_CAMP then return end
     state.time_total = run_state.total_time
 end
