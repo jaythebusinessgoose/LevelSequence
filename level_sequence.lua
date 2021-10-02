@@ -196,6 +196,16 @@ end
 ---- THEMES
 --------------------------------------
 
+local function theme_for_level(level)
+    if not level or not level.theme then return THEME.DWELLING end
+    return level.theme
+end
+
+local function subtheme_for_level(level)
+    if not level or not level.co_subtheme then return THEME.DWELLING end
+    return level.co_subtheme
+end
+
 -- Gets the level that doors will lead to for a particular theme.
 --
 -- theme: Theme that the door leads to.
@@ -211,7 +221,7 @@ end
 -- level: Level that the door leads to.
 -- Return: Level number that the door will be set to.
 local function level_for_level(level)
-	return level_for_theme(level.theme)
+	return level_for_theme(theme_for_level(level))
 end
 
 -- Gets the world that doors will lead to for a particular theme.
@@ -264,7 +274,7 @@ end
 -- level: Level that the door leads to.
 -- Return: World number that the door will be set to.
 local function world_for_level(level)
-	return world_for_theme(level.theme)
+	return world_for_theme(theme_for_level(level))
 end
 
 -- Gets the texture that should be used to texture doors for a particular theme.
@@ -334,7 +344,7 @@ end
 -- level: Level that the door leads to.
 -- Return: Texture to use for doors leading to the level.
 local function texture_for_level(level)
-    return texture_for_theme(level.theme, level.co_subtheme)
+    return texture_for_theme(theme_for_level(level), subtheme_for_level(level))
 end
 
 --------------------------------------
@@ -399,7 +409,7 @@ end
 --
 -- level: A level object that should have a theme and co_subtheme values.
 local function load_co_subtheme(level)
-    if level.theme == THEME.COSMIC_OCEAN and level.co_subtheme then
+    if theme_for_level(level) == THEME.COSMIC_OCEAN and level.co_subtheme then
         force_co_subtheme(level.co_subtheme)
     else
         force_co_subtheme(COSUBTHEME.RESET)
@@ -448,9 +458,10 @@ local function transition_increment_level_callback()
         sequence_callbacks.on_completed_level(previous_level, current_level)
     end
     if not current_level then
+        run_state.run_started = false
         if sequence_callbacks.on_win then
-            run_state.run_started = false
-            sequence.state.on_win(run_state.attempts, state.time_total)
+            print(f'sequence: {run_state.attempts}, {run_state.total_time}, {state.time_total}')
+            sequence_callbacks.on_win(run_state.attempts, state.time_total)
         end
     else
         load_co_subtheme(current_level)
@@ -485,7 +496,7 @@ local function update_state_and_doors()
         -- the player back to the current level, instead of going to the starting level.
 		state.world_start = world_for_level(current_level)
 		state.level_start = level_for_level(current_level)
-		state.theme_start = current_level.theme
+		state.theme_start = theme_for_level(current_level)
     end
 
 	local exit_uids = get_entities_by_type(ENT_TYPE.FLOOR_DOOR_EXIT)
@@ -543,7 +554,8 @@ end
 
 -- Set the time in the state so it shows up in the player's HUD.
 local function load_time_after_level_generation_callback()
-    if state.theme == THEME.BASE_CAMP or not run_state.run_started then return end
+    print(inspect(run_state))
+    if state.theme == THEME.BASE_CAMP then return end
     state.time_total = run_state.total_time
 end
 
@@ -589,7 +601,7 @@ local function replace_main_entrance()
 			layer,
 			world_for_level(first_level),
 			level_for_level(first_level),
-			first_level.theme)
+			theme_for_level(first_level))
         main_exits[#main_exits+1] = get_entity(door)
     end
 end
@@ -608,7 +620,7 @@ local function update_main_exits()
     for _, main_exit in pairs(main_exits) do
         main_exit.world = world_for_level(first_level)
         main_exit.level = level_for_level(first_level)
-        main_exit.theme = first_level.theme
+        main_exit.theme = theme_for_level(first_level)
     end
 end
 
@@ -645,7 +657,7 @@ level_sequence.SIGN_TYPE = SIGN_TYPE
 level_sequence.spawn_shortcut = function(x, y, layer, level, include_sign, sign_text)
     include_sign = include_sign or SIGN_TYPE.NONE
     local background_uid = spawn_entity(ENT_TYPE.BG_DOOR, x, y+.25, layer, 0, 0)
-    local door_uid = spawn_door(x, y, layer, world_for_level(level), level_for_level(level), level.theme)
+    local door_uid = spawn_door(x, y, layer, world_for_level(level), level_for_level(level), theme_for_level(level))
     local door = get_entity(door_uid)
     local background = get_entity(background_uid)
     background:set_texture(texture_for_level(level))
@@ -742,7 +754,7 @@ level_sequence.spawn_continue_door = function(
         no_run_sign_text)
     include_sign = include_sign or SIGN_TYPE.NONE
     local background_uid = spawn_entity(ENT_TYPE.BG_DOOR, x, y+.25, layer, 0, 0)
-    local door_uid = spawn_door(x, y, layer, world_for_level(level), level_for_level(level), level.theme)
+    local door_uid = spawn_door(x, y, layer, world_for_level(level), level_for_level(level), theme_for_level(level))
     local door = get_entity(door_uid)
     local background = get_entity(background_uid)
     background.animation_frame = set_flag(background.animation_frame, 1)
@@ -756,7 +768,7 @@ level_sequence.spawn_continue_door = function(
         end
         door.world = world_for_level(level)
         door.level = level_for_level(level)
-        door.theme = level.theme
+        door.theme = theme_for_level(level)
     end
 
     update_door_for_level(level)
