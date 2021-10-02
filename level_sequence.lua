@@ -972,11 +972,12 @@ end
 
 level_sequence.deactivate = function()
     if not active then return end
-    active = true
+    active = false
     for _, callback in pairs(internal_callbacks) do
         clear_callback(callback)
     end
     button_prompts.deactivate()
+    load_level(nil)
 end
 
 set_callback(function(ctx)
