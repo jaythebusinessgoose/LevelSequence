@@ -99,9 +99,9 @@ end
 ---- /CALLBACKS
 --------------------------------------
 
-local internal_callbacks = {
-    entrance_tile_code_callback = nil,
-}
+--------------------------------------
+---- RUN STATE
+--------------------------------------
 
 local run_state = {
     initial_level = nil,
@@ -111,6 +111,14 @@ local run_state = {
     run_started = false,
 }
 
+-- Gets the state of the current run that is in progress.
+--
+-- Return:
+--   initial_level: Level the run started on.
+--   current_level: Level the player is currently on.
+--   attempts: Number of attempts the player currently has in the run. A new attempt is added
+--             when starting or continuing a run from the base camp, or on a reset.
+--   total_time: The total amount of time the player has spent in the run.
 level_sequence.get_run_state = function()
     return {
         initial_level = run_state.initial_level,
@@ -120,22 +128,43 @@ level_sequence.get_run_state = function()
     }
 end
 
+-- Whether a run is currently in progress. If false, we are probably in the base camp or the main
+-- menu.
+--
+-- Return: Whether a run is in progress.
 level_sequence.run_in_progress = function()
     return run_state.run_started
 end
 
+-- Set whether or not to consider each level as a checkpoint. If set to false, will reset the run
+-- from the initial_level on resets.
+--
+-- keep_progress: Whether or not to keep progress on resets.
 level_sequence.set_keep_progress = function(keep_progress)
     sequence_state.keep_progress = keep_progress
 end
+
+-- Compares two levels to see if they are the same level. Compares identifiers if the objects are not
+-- identical, so that two levels with the same identifier are considered to be equal.
+--
+-- level_1: First of two levels to compare.
+-- level_2: Second of two levels to compare.
+-- Return: True if the two levels are considered equal, otherwise false.
 local function equal_levels(level_1, level_2)
     if not level_1 or not level_2 then return end
     return level_1 == level_2 or (level_1.identifier ~= nil and level_1.identifier == level_2.identifier)
 end
 
+-- Whether a shortcut was taken to get into the current run.
 level_sequence.took_shortcut = function()
     return run_state.initial_level and #sequence_state.levels > 0 and not equal_levels(run_state.initial_level, sequence_state.levels[1])
 end
 
+-- Attempts to get the index of a level within the current levels. Returns nil if no level is
+-- passed in or if the level cannot be found in the current levels.
+--
+-- level: Level to index.
+-- Return: Index of the level in the levels list.
 local function index_of_level(level)
     if not level then return nil end
     for index, level_at in pairs(sequence_state.levels) do
@@ -147,6 +176,10 @@ local function index_of_level(level)
 end
 level_sequence.index_of_level = index_of_level
 
+-- Attempts to get the next level in the levels list after the input level.
+--
+-- level: Level to find the next level of. If omitted, uses the current_level in the run_state.
+-- Return: Next level in the levels list.
 local function next_level(level)
     level = level or run_state.current_level
     local index = index_of_level(level)
@@ -155,18 +188,36 @@ local function next_level(level)
     return sequence_state.levels[index+1]
 end
 
-----------------
----- THEMES ----
-----------------
+--------------------------------------
+---- /RUN STATE
+--------------------------------------
 
+--------------------------------------
+---- THEMES
+--------------------------------------
+
+-- Gets the level that doors will lead to for a particular theme.
+--
+-- theme: Theme that the door leads to.
+-- Return: Level number that the door will be set to.
 local function level_for_theme(theme)
+    -- We return 5 to reduce the chances of conflict with special rooms such as black market,
+    -- challenges, Vlad's, and also with setrooms in stages such as 1-4.
 	return 5
 end
 
+-- Gets the level that doors will lead to for a particular level.
+--
+-- level: Level that the door leads to.
+-- Return: Level number that the door will be set to.
 local function level_for_level(level)
 	return level_for_theme(level.theme)
 end
 
+-- Gets the world that doors will lead to for a particular theme.
+--
+-- theme: Theme that the door leads to.
+-- Return: World number that the door will be set to.
 local function world_for_theme(theme)
 	if theme == THEME.DWELLING then
 		return 1
@@ -208,211 +259,19 @@ local function world_for_theme(theme)
 	return 1
 end
 
+-- Gets the world that doors will lead to for a particular level.
+--
+-- level: Level that the door leads to.
+-- Return: World number that the door will be set to.
 local function world_for_level(level)
 	return world_for_theme(level.theme)
 end
 
------------------
----- /THEMES ----
------------------
-
---------------------------
----- LEVEL GENERATION ----
---------------------------
-
-local loaded_level = nil
-local function load_level(level, ctx)
-	if loaded_level then
-        if sequence_callbacks.on_level_will_unload then
-            sequence_callbacks.on_level_will_unload(loaded_level)
-        end
-		loaded_level.unload_level()
-		custom_levels.unload_level()
-	end
-
-    loaded_level = level
-	if not loaded_level then return end
-
-    if sequence_callbacks.on_level_will_load then
-        sequence_callbacks.on_level_will_load(loaded_level)
-    end
-	loaded_level.load_level()
-	custom_levels.load_level(level.file_name, level.width, level.height, ctx)
-end
-
-set_callback(function(ctx)
-    -- Unload any loaded level when entering the base camp or the title screen.
-	if state.theme == THEME.BASE_CAMP or state.theme == 0 then
-		load_level(nil)
-		return
-	end
-	local level = run_state.current_level
-	load_level(level, ctx)
-end, ON.PRE_LOAD_LEVEL_FILES)
-
----------------------------
----- /LEVEL GENERATION ----
----------------------------
-
-----------------------
----- CONTINUE RUN ----
-----------------------
-
-local function load_co_subtheme(level)
-    if level.theme == THEME.COSMIC_OCEAN and level.co_subtheme then
-        force_co_subtheme(level.co_subtheme)
-    else
-        force_co_subtheme(COSUBTHEME.RESET)
-    end
-end
-
-local function load_run(level, attempts, time)
-    run_state.initial_level = sequence_state.levels[1]
-    run_state.current_level = level
-    run_state.attempts = attempts
-    run_state.total_time = time
-    load_co_subtheme(level)
-end
-
-local function load_shortcut(level)
-    run_state.current_level = level
-    run_state.initial_level = level
-    run_state.attempts = 0
-    run_state.total_time = 0
-    load_co_subtheme(level)
-end
-
------------------------
----- /CONTINUE RUN ----
------------------------
-
----------------------------
----- LEVEL TRANSITIONS ----
----------------------------
-
-set_callback(function()
-    local previous_level = run_state.current_level
-    local current_level = next_level()
-    run_state.current_level = current_level
-    if sequence_callbacks.on_completed_level then
-        sequence_callbacks.on_completed_level(previous_level, current_level)
-    end
-    if not current_level then
-        if sequence_callbacks.on_win then
-            run_state.run_started = false
-            sequence.state.on_win(run_state.attempts, state.time_total)
-        end
-    else
-        load_co_subtheme(current_level)
-    end
-end, ON.TRANSITION)
-
-----------------------------
----- /LEVEL TRANSITIONS ----
-----------------------------
-
-------------------------------
----- TIME SYNCHRONIZATION ----
-------------------------------
-
--- Since we are keeping track of time for the entire run even through deaths and resets, we must track
--- what the time was on resets and level transitions.
-set_callback(function()
-    if state.theme == THEME.BASE_CAMP or not run_state.run_started then return end
-    if sequence_state.keep_progress then
-        -- Save the time on reset so we can keep the timer going.
-        run_state.total_time = state.time_total
-    else
-        -- Reset the time when keep progress is disabled; the run is going to be reset.
-        run_state.total_time = 0
-    end
-end, ON.RESET)
-
-set_callback(function()
-    if state.theme == THEME.BASE_CAMP or not run_state.run_started then return end
-    run_state.total_time = state.time_total
-end, ON.TRANSITION)
-
-set_callback(function()
-    if state.theme == THEME.BASE_CAMP then return end
-    state.time_total = run_state.total_time
-end, ON.POST_LEVEL_GENERATION)
-
-set_callback(function()
-    if state.theme == THEME.BASE_CAMP then return end
-    run_state.run_started = true
-    run_state.attempts = run_state.attempts + 1
-end, ON.START)
-
-set_callback(function()
-    run_state.run_started = false
-    run_state.attempts = 0
-    run_state.current_level = nil
-    run_state.total_time = 0
-end, ON.CAMP)
-
--------------------------------
----- /TIME SYNCHRONIZATION ----
--------------------------------
-
--- Reset the run state if the game is reset and keep progress is not enabled.
-set_callback(function()
-    if not sequence_state.keep_progress then
-        run_state.current_level = run_state.initial_level
-        run_state.attempts = 0
-        if sequence_callbacks.on_reset_run then
-            sequence_callbacks.on_reset_run()
-        end
-    end
-end, ON.RESET)
-
-set_callback(function()
-    if state.theme == THEME.BASE_CAMP then return end
-    local current_level = run_state.current_level
-    local next_level_file = next_level()
-    if not current_level then return end
-    
-    -- This doesn't affect anything except what is displayed in the UI.
-	state.world = current_level.world or index_of_level(current_level)
-    state.level = current_level.level or 1
-
-    if sequence_state.keep_progress then
-		-- Setting the _start properties of the state will ensure that Instant Restarts will take
-        -- the player back to the current level, instead of going to the starting level.
-		state.world_start = world_for_level(current_level)
-		state.level_start = level_for_level(current_level)
-		state.theme_start = current_level.theme
-    end
-
-	local exit_uids = get_entities_by_type(ENT_TYPE.FLOOR_DOOR_EXIT)
-	for _, exit_uid in pairs(exit_uids) do
-		local exit_ent = get_entity(exit_uid)
-		if exit_ent then
-			exit_ent.entered = false
-			exit_ent.special_door = true
-			if not next_level_file then
-				-- The door in the final level will take the player back to the camp.
-				exit_ent.world = 1
-				exit_ent.level = 1
-				exit_ent.theme = THEME.BASE_CAMP
-			else
-				-- Sets the theme of the door to the theme of the next level we will load.
-				exit_ent.world = world_for_level(next_level_file)
-				exit_ent.level = level_for_level(next_level_file)
-				exit_ent.theme = next_level_file.theme
-			end
-		end
-	end
-
-    if sequence_callbacks.on_post_level_generation then
-        sequence_callbacks.on_post_level_generation(current_level)
-    end
-end, ON.POST_LEVEL_GENERATION)
-
---------------
----- CAMP ----
---------------
-
+-- Gets the texture that should be used to texture doors for a particular theme.
+--
+-- theme: Theme that the door leads to.
+-- co_subtheme: Theme that the door leads to within the cosmic ocean.
+-- Return: Texture to use for doors leading to the theme.
 local function texture_for_theme(theme, co_subtheme)
     if theme == THEME.DWELLING then
         return TEXTURE.DATA_TEXTURES_FLOOR_CAVE_2
@@ -470,9 +329,247 @@ local function texture_for_theme(theme, co_subtheme)
     return TEXTURE.DATA_TEXTURES_FLOOR_CAVE_2
 end
 
+-- Gets the texture that should be used to texture doors for a particular level.
+--
+-- level: Level that the door leads to.
+-- Return: Texture to use for doors leading to the level.
 local function texture_for_level(level)
     return texture_for_theme(level.theme, level.co_subtheme)
 end
+
+--------------------------------------
+---- /THEMES
+--------------------------------------
+
+--------------------------------------
+---- LEVEL GENERATION
+--------------------------------------
+
+local loaded_level = nil
+-- Load a level. Loads the tile codes and callbacks of the level, then uses custom_levels to load
+-- the level file and replace any existing level files.
+--
+-- level: Level to load.
+-- ctx: Context to load the level into.
+local function load_level(level, ctx)
+	if loaded_level then
+        if sequence_callbacks.on_level_will_unload then
+            sequence_callbacks.on_level_will_unload(loaded_level)
+        end
+		loaded_level.unload_level()
+		custom_levels.unload_level()
+	end
+
+    loaded_level = level
+	if not loaded_level then return end
+
+    if sequence_callbacks.on_level_will_load then
+        sequence_callbacks.on_level_will_load(loaded_level)
+    end
+	loaded_level.load_level()
+	custom_levels.load_level(level.file_name, level.width, level.height, ctx)
+end
+
+-- Called just before the level files are loaded. It is here that we load the level files
+-- for the current level and activate the callbacks of the level.
+--
+-- ctx: Context to load levels into.
+local function pre_load_level_files_callback(ctx)
+    -- Unload any loaded level when entering the base camp or the title screen.
+	if state.theme == THEME.BASE_CAMP or state.theme == 0 then
+		load_level(nil)
+		return
+	end
+	local level = run_state.current_level
+	load_level(level, ctx)
+end
+
+
+--------------------------------------
+---- /LEVEL GENERATION
+--------------------------------------
+
+--------------------------------------
+---- SHORTCUT LOADING
+--------------------------------------
+
+-- Force the CO subtheme for a level.
+-- If the theme of the level is not THEME.COSMIC_OCEAN, the subtheme will instead be reset to
+-- a random subtheme.
+--
+-- level: A level object that should have a theme and co_subtheme values.
+local function load_co_subtheme(level)
+    if level.theme == THEME.COSMIC_OCEAN and level.co_subtheme then
+        force_co_subtheme(level.co_subtheme)
+    else
+        force_co_subtheme(COSUBTHEME.RESET)
+    end
+end
+
+-- Load in an on-going run from a continue state.
+--
+-- level: The level that the player is currently on in the run.
+-- attempts: The number of attempts the player has on the run.
+-- time: The amount of time the player has spent in the run.
+local function load_run(level, attempts, time)
+    run_state.initial_level = sequence_state.levels[1]
+    run_state.current_level = level
+    run_state.attempts = attempts
+    run_state.total_time = time
+    load_co_subtheme(level)
+end
+
+-- Load in a shortcut to a level. Sets the initial_level to that level so that resets in hardcore
+-- reset at the level.
+--
+-- level: The level that the shortcut leads to.
+local function load_shortcut(level)
+    run_state.current_level = level
+    run_state.initial_level = level
+    run_state.attempts = 0
+    run_state.total_time = 0
+    load_co_subtheme(level)
+end
+
+--------------------------------------
+---- /SHORTCUT LOADING
+--------------------------------------
+
+--------------------------------------
+---- LEVEL TRANSITIONS
+--------------------------------------
+
+-- Load the next level on transitions. If we were on the last level, call the on_win callback.
+local function transition_increment_level_callback()
+    local previous_level = run_state.current_level
+    local current_level = next_level()
+    run_state.current_level = current_level
+    if sequence_callbacks.on_completed_level then
+        sequence_callbacks.on_completed_level(previous_level, current_level)
+    end
+    if not current_level then
+        if sequence_callbacks.on_win then
+            run_state.run_started = false
+            sequence.state.on_win(run_state.attempts, state.time_total)
+        end
+    else
+        load_co_subtheme(current_level)
+    end
+end
+
+-- Reset the run state if the game is reset and keep progress is not enabled.
+local function reset_run_if_hardcore()
+    if not sequence_state.keep_progress then
+        run_state.current_level = run_state.initial_level
+        run_state.attempts = 0
+        if sequence_callbacks.on_reset_run then
+            sequence_callbacks.on_reset_run()
+        end
+    end
+end
+
+-- Update the display of the world-level to the desired display instead of using the
+-- world-level we set for the theme to load properly.
+local function update_state_and_doors()
+    if state.theme == THEME.BASE_CAMP then return end
+    local current_level = run_state.current_level
+    local next_level_file = next_level()
+    if not current_level then return end
+    
+    -- This doesn't affect anything except what is displayed in the UI.
+	state.world = current_level.world or index_of_level(current_level)
+    state.level = current_level.level or 1
+
+    if sequence_state.keep_progress then
+		-- Setting the _start properties of the state will ensure that Instant Restarts will take
+        -- the player back to the current level, instead of going to the starting level.
+		state.world_start = world_for_level(current_level)
+		state.level_start = level_for_level(current_level)
+		state.theme_start = current_level.theme
+    end
+
+	local exit_uids = get_entities_by_type(ENT_TYPE.FLOOR_DOOR_EXIT)
+	for _, exit_uid in pairs(exit_uids) do
+		local exit_ent = get_entity(exit_uid)
+		if exit_ent then
+			exit_ent.entered = false
+			exit_ent.special_door = true
+			if not next_level_file then
+				-- The door in the final level will take the player back to the camp.
+				exit_ent.world = 1
+				exit_ent.level = 1
+				exit_ent.theme = THEME.BASE_CAMP
+			else
+				-- Sets the theme of the door to the theme of the next level we will load.
+				exit_ent.world = world_for_level(next_level_file)
+				exit_ent.level = level_for_level(next_level_file)
+				exit_ent.theme = next_level_file.theme
+			end
+		end
+	end
+
+    if sequence_callbacks.on_post_level_generation then
+        sequence_callbacks.on_post_level_generation(current_level)
+    end
+end
+
+--------------------------------------
+---- /LEVEL TRANSITIONS
+--------------------------------------
+
+--------------------------------------
+---- TIME SYNCHRONIZATION
+--------------------------------------
+
+-- Since we are keeping track of time for the entire run even through deaths and resets, we must track
+-- what the time was on resets and level transitions.
+local function save_time_on_reset_callback()
+    if state.theme == THEME.BASE_CAMP or not run_state.run_started then return end
+    if sequence_state.keep_progress then
+        -- Save the time on reset so we can keep the timer going.
+        run_state.total_time = state.time_total
+    else
+        -- Reset the time when keep progress is disabled; the run is going to be reset.
+        run_state.total_time = 0
+    end
+end
+
+-- Save the time of the run on transitions so that the run state is correct on starting
+-- the next level.
+local function save_time_on_transition_callback()
+    if state.theme == THEME.BASE_CAMP or not run_state.run_started then return end
+    run_state.total_time = state.time_total
+end
+
+-- Set the time in the state so it shows up in the player's HUD.
+local function load_time_after_level_generation_callback()
+    if state.theme == THEME.BASE_CAMP or not run_state.run_started then return end
+    state.time_total = run_state.total_time
+end
+
+-- Increase the attempts on level start, and mark the run as started on the first level start so
+-- we can begin keeping track of the time.
+local function start_level_callback()
+    if state.theme == THEME.BASE_CAMP then return end
+    run_state.run_started = true
+    run_state.attempts = run_state.attempts + 1
+end
+
+local function reset_on_camp_callback()
+    run_state.run_started = false
+    run_state.attempts = 0
+    run_state.current_level = nil
+    run_state.total_time = 0
+end
+
+--------------------------------------
+---- /TIME SYNCHRONIZATION
+--------------------------------------
+
+--------------
+---- CAMP ----
+--------------
+
 
 local main_exits = {}
 local shortcuts = {}
@@ -764,4 +861,45 @@ set_callback(function()
     end
 end, ON.CAMP)
 
+--------------------------------------
+---- STATE CALLBACKS
+--------------------------------------
+
+local active = false
+local internal_callbacks = {}
+local function add_callback(callback)
+    internal_callbacks[#internal_callbacks+1] = callback
+end
+level_sequence.activate = function()
+    if active then return end
+    active = true
+    button_prompts.activate()
+    add_callback(set_callback(pre_load_level_files_callback, ON.PRE_LOAD_LEVEL_FILES))
+    add_callback(set_callback(transition_increment_level_callback, ON.TRANSITION))
+    add_callback(set_callback(save_time_on_reset_callback, ON.RESET))
+    add_callback(set_callback(save_time_on_transition_callback, ON.TRANSITION))
+    add_callback(set_callback(load_time_after_level_generation_callback, ON.POST_LEVEL_GENERATION))
+    add_callback(set_callback(start_level_callback, ON.START))
+    add_callback(set_callback(reset_on_camp_callback, ON.CAMP))
+    add_callback(set_callback(reset_run_if_hardcore, ON.RESET))
+    add_callback(set_callback(update_state_and_doors, ON.POST_LEVEL_GENERATION))
+end
+
+level_sequence.deactivate = function()
+    if not active then return end
+    active = true
+    for _, callback in pairs(internal_callbacks) do
+        clear_callback(callback)
+    end
+    button_prompts.deactivate()
+end
+
+set_callback(function(ctx)
+    -- Initialize in the active state.
+    level_sequence.activate()
+end, ON.LOAD)
+
+--------------------------------------
+---- /STATE CALLBACKS
+--------------------------------------
 return level_sequence
