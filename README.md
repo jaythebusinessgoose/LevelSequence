@@ -100,7 +100,7 @@ Default value: true
 
 ### State inspection
 
-* `get_run_state()`
+* `get_run_state()` \
 Gets the state of the current run that is in progress.
 \
 Returns an object with:
@@ -109,18 +109,18 @@ Returns an object with:
     - `attempts` (int): Number of attempts the player currently has in the run. A new attempt is added when starting or continuing a run from the base camp, or on a reset/instant restart.
     - `total_time` (int): The total amount of time the player has spent in the run, in number of frames.
 
-* `run_in_progress()`
+* `run_in_progress()` \
 Whether a run is currently in progress. If false, we are probably in the base camp or main menu.
     * Return: Boolean
 Whether a run is in progress.
 
-* `took_shortcut()`
+* `took_shortcut()` \
 Whether a shortcut was taken to enter the current run.
     * Return: Boolean
 Whether the player went through a shortcut door.
 Note: This method returns false if the shortcut was to the first level.
 
-* `index_of_level(level)`
+* `index_of_level(level)` \
 Attempts to get the index of a level within the current levels. Returns nil if no level is passed in or if the level cannot be found in the current levels.
     * `level`: Level to attempt to index.
     * Return: int
@@ -130,13 +130,13 @@ Index of level in the levels list.
 
 There are convenience methods to spawn shortcut doors and also to spawn doors to continue a run in progress. The state to handle saving and loading the run is not handled by this script, but the callbacks listed later allow the state to be accessed and saved.
 
-* `SIGN_TYPE` enum
+* `SIGN_TYPE` enum \
 Enum that the shortcut methods use to decide whether to and where to spawn a sign in relation to the door.
     * `NONE`: Do not spawn any sign.
     * `LEFT`: Spawn a sign to the left of the door.
     * `RIGHT`: Spawn a sign to the right of the door.
 
-* `spawn_shortcut(x, y, layer, level, include_sign, sign_text)`
+* `spawn_shortcut(x, y, layer, level, include_sign, sign_text)` \
 Spawns a shortcut door at the desired coordinates. When the player walks in front of the door it is "loaded" into the state and a callback is triggered notifying that the shortcut will be entered. When the player leaves the door, the first level is instead "loaded" into the ste and the callback is triggered again.
     * `x`: x position that the door will spawn at.
     * `y`: y position that the door will spawn at.
@@ -189,50 +189,50 @@ Spawns a door that can be entered to continue an ongoing run.
 
 There are several callbacks that are called when certain events occur. These are useful to hook into to set local state on these events for displaying custom UI or configuring levels.
 
-* `set_on_level_will_unload(callback)`
+* `set_on_level_will_unload(callback)` \
 Called during level gen just before unloading the previous level.
 \
 Callback signature: `function(level)`
     * `level`: Level that will be unloaded
 
-* `set_on_level_will_load(callback)`
+* `set_on_level_will_load(callback)` \
 Called during level gen just before loading the current level.
 \
 Callback signature: `function(level)`
     * `level`: Level that will be loaded
 
-* `set_on_post_level_generation(callback)`
+* `set_on_post_level_generation(callback)` \
 Called during post level generation, after the level state has been configured.
 \
 Callback signature: `function(level)`
     * `level`: Level that is currently loaded.
 
-* `set_on_reset_run(callback)`
+* `set_on_reset_run(callback)` \
 Called when the run is reset back to the first level.
 This callback will never be called if keep_progress is `true`.
 
-* `set_on_completed_level(callback)`
+* `set_on_completed_level(callback)` \
 Called in the transition after a level has been completed.
 \
 Callback signature: `function(completed_level, next_level)`
     * `completed_level`: The level that was just completed.
     * `next_level`: The level that will be loaded next.
 
-* `set_on_win(callback)`
+* `set_on_win(callback)` \
 Called in the transition after the final level has been completed.
 \
 Callback signature: `function(attempts, time)`
     * `attempts`: Number of attempts it took to complete all levels. Each reset/game exit counts towards the number of attempts.
     * `time`: Total amount of time it took to complete all levels.
 
-* `set_on_prepare_initial_level(callback)`
+* `set_on_prepare_initial_level(callback)` \
 Called in the base camp when the initial level is updated, ie via walking by a shortcut door.
 \
 Callback signature: `function(level, continuing_run)`
     * `level`: Initial level that will be loaded when going through an entrance door.
     * `continuing_run`: True if going through a continue door. Otherwise, false.
 
-* `set_on_level_start(callback)`
+* `set_on_level_start(callback)` \
 Called each time a level starts. This includes both the first time the level is encountered and on every reset that resets to the level.
 \
 Callback signature: `function(level)`
