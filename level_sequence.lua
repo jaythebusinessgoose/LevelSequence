@@ -221,7 +221,7 @@ local function theme_for_level(level)
 end
 
 local function subtheme_for_level(level)
-    if not level or not level.co_subtheme then return THEME.DWELLING end
+    if not level or not level.co_subtheme then return COSUBTHEME.RESET end
     return level.co_subtheme
 end
 
@@ -761,6 +761,8 @@ end
 --           disabled_sign_text: The text that will be displayed if continuing is disabled.
 --           no_run_sign_text: The text that will be displayed if there is no run to continue.
 --           destroy(): Method that can be called to remove the door.
+--           update_door(level, attempts, time, sign_text, disabled_sign_text, no_run_sign_text): Method
+--               that can be called to update the state of the run that the door will continue to.
 level_sequence.spawn_continue_door = function(
         x,
         y,
