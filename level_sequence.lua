@@ -1021,11 +1021,11 @@ level_sequence.activate = function()
     add_callback(set_callback(reset_on_camp_callback, ON.CAMP))
     add_callback(set_callback(reset_run_if_hardcore, ON.RESET))
     add_callback(set_callback(update_state_and_doors, ON.POST_LEVEL_GENERATION))
-    add_callback(set_callback(reset_camp_doors, ON.LEVEL))
+    add_callback(set_callback(reset_camp_doors, ON.PRE_LOAD_LEVEL_FILES))
     add_callback(set_callback(replace_main_entrance, ON.CAMP))
     add_callback(set_callback(handle_sign_toasts, ON.GAMEFRAME))
     add_callback(set_callback(update_current_entry, ON.GAMEFRAME))
-    set_callback(convert_buffered_levels, ON.CAMP)
+    add_callback(set_callback(convert_buffered_levels, ON.CAMP))
 end
 
 level_sequence.deactivate = function()
@@ -1036,6 +1036,8 @@ level_sequence.deactivate = function()
     end
     button_prompts.deactivate()
     load_level(nil)
+
+    reset_camp_doors()
 end
 
 set_callback(function(ctx)
