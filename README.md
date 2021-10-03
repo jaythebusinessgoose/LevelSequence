@@ -11,11 +11,11 @@ Each room must be created as a setroom template with the format `setroomy_x`. Th
 
 Due to the way level files are loaded in, some extra configuration is required if the LevelSequence package is relocated. If it is anywhere other than the root directory of the mod, or has a name other than LevelSequence, `set_directory` must be called, passing the path to the directory within the mod folder including the directory name. Eg, for `MyCoolMod/SweetFolder/LevelSequence/level_sequence.lua` call `level_sequence.set_directory('SweetFolder/LevelSequence')`.
 
-* `activate()`
+* `activate()` \
 Call this method to activate the script.
 The script is activated by default, so this only must be called if the script was deactivated.
 
-* `deactivate()`
+* `deactivate()` \
 Call this method to deactivate the script. The levels will not be reset when deactivated, but they will not be loaded until activated again.
 
 ## Levels
