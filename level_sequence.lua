@@ -20,6 +20,8 @@ local sequence_state = {
     -- Whether each level acts as a checkpoint. If false, the run will reset on the first level
     -- upon each death/reset.
     keep_progress = true,
+    -- If set, these types of procedural spawns will be allowed to spawn in. See custom_levels.ALLOW_SPAWN_TYPE.
+    allowed_spawn_types = nil,
 }
 
 --------------------------------------
@@ -396,7 +398,7 @@ local function load_level(level, ctx)
         sequence_callbacks.on_level_will_load(loaded_level)
     end
 	loaded_level.load_level()
-	custom_levels.load_level(level.file_name, level.width, level.height, ctx)
+	custom_levels.load_level(level.file_name, level.width, level.height, ctx, sequence_state.allowed_spawn_types)
 end
 
 -- Called just before the level files are loaded. It is here that we load the level files
@@ -984,6 +986,20 @@ end
 --------------------------------------
 
 --------------------------------------
+---- CUSTOM LEVEL SPAWNS
+--------------------------------------
+
+level_sequence.ALLOW_SPAWN_TYPE = custom_levels.ALLOW_SPAWN_TYPE
+
+function level_sequence.allow_spawn_types(allowed_spawn_types)
+    sequence_state.allowed_spawn_types = allowed_spawn_types
+end
+
+--------------------------------------
+---- /CUSTOM LEVEL SPAWNS
+--------------------------------------
+
+--------------------------------------
 ---- STATE CALLBACKS
 --------------------------------------
 
@@ -1030,4 +1046,5 @@ end, ON.LOAD)
 --------------------------------------
 ---- /STATE CALLBACKS
 --------------------------------------
+
 return level_sequence

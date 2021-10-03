@@ -246,42 +246,24 @@ The game crashes upon entering a Cosmic Ocean level from a non-CO level. Loading
 ## Procedural Spawns
 
 Random spawns such as crates, rocks, webs, gold, and embedded items, are removed by default so that only
-manually spawned items exist. For some of these items, this means that tile codes that add the item will not spawn the item.
+manually spawned items exist. For some of these items, this may mean that tile codes that add the item will not spawn the item.
 
 It should work to create a custom tile code to spawn in the entity and manually spawn it in the script.
 
-The following entities must be forced to spawn during level generation:
-- ENT_TYPE.EMBED_GOLD
-- ENT_TYPE.EMBED_GOLD_BIG
-- ENT_TYPE.ITEM_RUBY
-- ENT_TYPE.ITEM_SAPPHIRE
-- ENT_TYPE.ITEM_EMERALD
-- ENT_TYPE.ITEM_ALIVE_EMBEDDED_ON_ICE
-- ENT_TYPE.ITEM_PICKUP_ROPEPILE
-- ENT_TYPE.ITEM_PICKUP_BOMBBAG
-- ENT_TYPE.ITEM_PICKUP_BOMBBOX
-- ENT_TYPE.ITEM_PICKUP_SPECTACLES
-- ENT_TYPE.ITEM_PICKUP_CLIMBINGGLOVES
-- ENT_TYPE.ITEM_PICKUP_PITCHERSMITT
-- ENT_TYPE.ITEM_PICKUP_SPRINGSHOES
-- ENT_TYPE.ITEM_PICKUP_SPIKESHOES
-- ENT_TYPE.ITEM_PICKUP_PASTE
-- ENT_TYPE.ITEM_PICKUP_COMPASS
-- ENT_TYPE.ITEM_PICKUP_PARACHUTE
-- ENT_TYPE.ITEM_CAPE
-- ENT_TYPE.ITEM_JETPACK
-- ENT_TYPE.ITEM_TELEPORTER_BACKPACK
-- ENT_TYPE.ITEM_HOVERPACK
-- ENT_TYPE.ITEM_POWERPACK
-- ENT_TYPE.ITEM_WEBGUN
-- ENT_TYPE.ITEM_SHOTGUN
-- ENT_TYPE.ITEM_FREEZERAY
-- ENT_TYPE.ITEM_CROSSBOW
-- ENT_TYPE.ITEM_CAMERA
-- ENT_TYPE.ITEM_TELEPORTER
-- ENT_TYPE.ITEM_MATTOCK
-- ENT_TYPE.ITEM_BOOMERANG
-- ENT_TYPE.ITEM_MACHETE
+To allow these spawns to spawn procedurally anyway, set the allowed spawn bitmask via `allow_spawn_types(allowed_spawn_types)`.
+
+`allowed_spawn_types` parameter is a bitmask  of the `ALLOW_SPAWN_TYPE` enum.
+`ALLOW_SPAWN_TYPE`:
+- `PROCEDURAL` (Items in the level, such as gold, pots, crates, ghost pot, etc)
+- `EMBEDDED_CURRENCY` (Gold and gems embedded in the wall)
+- `EMBEDDED_ITEMS` (Items such as backpacks, weapons, and powerups embedded in the wall)
+
+This will allow all spawns except for gold and gems embedded in the wall:
+```
+    local allowed_spawns = set_flag(0, level_sequence.ALLOW_SPAWN_TYPE.PROCEDURAL)
+    allowed_spawns = set_flag(allowed_spawns, level_sequence.ALLOW_SPAWN_TYPE.EMBEDDED_ITEMS)
+    level_sequence.allow_spawn_types(allowed_spawns)
+```
 
 ## Back layers
 
