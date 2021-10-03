@@ -157,7 +157,7 @@ Spawns a shortcut door at the desired coordinates. When the player walks in fron
     level_sequence.spawn_shortcut(0, 0, LAYER.FRONT, dwelling_level_1, level_sequence.SIGN_TYPE.RIGHT)
     ```
 
-* `spawn_continue_door(x, y, layer, level, attempts, time, include_sign, sign_text, disabled_sign_text, no_run_sign_text)`
+* `spawn_continue_door(x, y, layer, level, attempts, time, include_sign, sign_text, disabled_sign_text, no_run_sign_text)` \
 Spawns a door that can be entered to continue an ongoing run.
     * `x`: x position that the door will spawn at.
     * `y`: y position that the door will spawn at.
