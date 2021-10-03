@@ -4,6 +4,14 @@ local button_prompts = require("ButtonPrompts/button_prompts")
 
 local level_sequence = {}
 
+function level_sequence.set_directory(directory)
+    if directory then
+        custom_levels.set_directory(directory .. "/CustomLevels")
+    else
+        custom_levels.set_directory("LevelSequence/CustomLevels")
+    end
+end
+
 local sequence_state = {
     levels = {},
     -- Stores the desired levels if changed while not in the camp. Will set levels with
