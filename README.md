@@ -7,6 +7,14 @@ Like the CustomLevels tool, the level loading supports levels of any size up to 
 
 Each room must be created as a setroom template with the format `setroomy_x`. This is slightly different from the `setroomy-x` that the game uses for setrooms.
 
+### Examples
+
+For some examples of how to use the LevelSequence tool, see:
+* [ExampleKaizo](https://github.com/jaythebusinessgoose/ExampleKaizo) \
+A simple example of how to format the level files and how to set up the sequence.
+* [JumpLunky](https://github.com/jaythebusinessgoose/JumpLunky) \
+A full mod that uses more advanced features of LevelSequence.
+
 ### Configuration
 
 Due to the way level files are loaded in, some extra configuration is required if the LevelSequence package is relocated. If it is anywhere other than the root directory of the mod, or has a name other than LevelSequence, `set_directory` must be called, passing the path to the directory within the mod folder including the directory name. Eg, for `MyCoolMod/SweetFolder/LevelSequence/level_sequence.lua` call `level_sequence.set_directory('SweetFolder/LevelSequence')`.
