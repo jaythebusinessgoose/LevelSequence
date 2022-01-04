@@ -7,6 +7,12 @@ Like the CustomLevels tool, the level loading supports levels of any size up to 
 
 Each room must be created as a setroom template with the format `setroomy_x`. This is slightly different from the `setroomy-x` that the game uses for setrooms.
 
+### Clone
+
+Run the clone command to clone the repo including submodules:
+
+```git clone --recurse-submodules https://github.com/jaythebusinessgoose/LevelSequence```
+
 ### Examples
 
 For some examples of how to use the LevelSequence tool, see:
