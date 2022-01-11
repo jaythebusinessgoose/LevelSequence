@@ -112,6 +112,32 @@ Default value: true
     level_sequence.set_keep_progress(false)
     ```
 
+## Entrance Doors
+
+By default, entrance doors are hidden since they can look strange in many custom levels. This can be configured by calling the
+set_hide_entrance methods.
+
+```
+-- Hide the entrances.
+level_sequence.set_hide_entrance(true)
+
+-- Do not hide the entrances.
+level_sequence.set_hide_entrance(false)
+```
+
+## Change Sequence
+
+To force a level other than the next level in the sequence to be loaded next, call the `force_next_level` method. After the forced
+level is completed, the sequence will continue from it. To no longer force the level, call the method and pass `nil`.
+
+To force the win state when exiting a level that is not the last level in the sequence, call the `force_win` method. Call the method with `false` to no longer force a win.
+
+```
+level_sequence.force_next_level(dwelling)
+
+level_sequence.force_win(true)
+```
+
 ### State inspection
 
 * `get_run_state()` \
