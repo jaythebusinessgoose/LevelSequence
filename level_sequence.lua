@@ -377,12 +377,19 @@ end
 --------------------------------------
 
 local loaded_level = nil
+local has_reset = false
 -- Load a level. Loads the tile codes and callbacks of the level, then uses custom_levels to load
 -- the level file and replace any existing level files.
 --
 -- level: Level to load.
 -- ctx: Context to load the level into.
 local function load_level(level, ctx)
+    if loaded_level ~= nil and equal_levels(loaded_level, level) and not has_reset then
+        level.load_next_room()
+        custom_levels.unload_level()
+        custom_levels.load_level(level.file_name, level.width, level.height, ctx, sequence_state.allowed_spawn_types)
+        return
+    end
 	if loaded_level then
         if sequence_callbacks.on_level_will_unload then
             sequence_callbacks.on_level_will_unload(loaded_level)
@@ -399,6 +406,10 @@ local function load_level(level, ctx)
     end
 	loaded_level.load_level()
 	custom_levels.load_level(level.file_name, level.width, level.height, ctx, sequence_state.allowed_spawn_types)
+end
+
+local function on_reset_callback()
+    has_reset = true
 end
 
 -- Called just before the level files are loaded. It is here that we load the level files
@@ -473,7 +484,11 @@ end
 -- Load the next level on transitions. If we were on the last level, call the on_win callback.
 local function transition_increment_level_callback()
     local previous_level = run_state.current_level
-    local current_level = next_level()
+    local current_level = previous_level
+    if previous_level.is_multi_room and not previous_level.should_complete then
+        return
+    end
+    current_level = next_level()
     run_state.current_level = current_level
     if sequence_callbacks.on_completed_level then
         sequence_callbacks.on_completed_level(previous_level, current_level)
@@ -506,7 +521,7 @@ local function update_state_and_doors()
     local current_level = run_state.current_level
     local next_level_file = next_level()
     if not current_level then return end
-    
+
     -- This doesn't affect anything except what is displayed in the UI.
 	state.world = current_level.world or index_of_level(current_level)
     state.level = current_level.level or 1
@@ -782,7 +797,7 @@ level_sequence.spawn_continue_door = function(
     local door = get_entity(door_uid)
     local background = get_entity(background_uid)
     background.animation_frame = set_flag(background.animation_frame, 1)
-    
+
     local function update_door_for_level(level)
         background:set_texture(texture_for_level(level))
         if not level or not sequence_state.keep_progress then
@@ -864,7 +879,7 @@ local function update_current_entry()
     if state.theme ~= THEME.BASE_CAMP then return end
     local player = players[1]
     for _, shortcut in pairs(shortcuts) do
-        if (shortcut.door and distance(player.uid, shortcut.door.uid) <= 1) or 
+        if (shortcut.door and distance(player.uid, shortcut.door.uid) <= 1) or
                 (shortcut.sign and distance(player.uid, shortcut.sign.uid) <= 1) then
             load_shortcut(shortcut.level)
             if sequence_callbacks.on_prepare_initial_level then
@@ -885,7 +900,7 @@ local function update_current_entry()
             return
         end
     end
-    -- If not next to any door, just set the state to the initial level. 
+    -- If not next to any door, just set the state to the initial level.
     load_shortcut(sequence_state.levels[1])
     if sequence_callbacks.on_prepare_initial_level then
         sequence_callbacks.on_prepare_initial_level(sequence_state.levels[1], false)
@@ -1012,6 +1027,7 @@ level_sequence.activate = function()
     if active then return end
     active = true
     button_prompts.activate()
+    add_callback(set_callback(on_reset_callback, ON.RESET))
     add_callback(set_callback(pre_load_level_files_callback, ON.PRE_LOAD_LEVEL_FILES))
     add_callback(set_callback(transition_increment_level_callback, ON.TRANSITION))
     add_callback(set_callback(save_time_on_reset_callback, ON.RESET))
