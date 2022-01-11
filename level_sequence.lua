@@ -1010,6 +1010,10 @@ function level_sequence.allow_spawn_types(allowed_spawn_types)
     sequence_state.allowed_spawn_types = allowed_spawn_types
 end
 
+function level_sequence.set_hide_entrance(hide_entrance)
+    custom_levels.set_hide_entrance(hide_entrance)
+end
+
 --------------------------------------
 ---- /CUSTOM LEVEL SPAWNS
 --------------------------------------
