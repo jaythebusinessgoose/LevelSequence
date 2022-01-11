@@ -22,6 +22,11 @@ local sequence_state = {
     keep_progress = true,
     -- If set, these types of procedural spawns will be allowed to spawn in. See custom_levels.ALLOW_SPAWN_TYPE.
     allowed_spawn_types = nil,
+    -- If set, the selected level will be next in sequence. The sequence will continue from that level after
+    -- completion.
+    force_next_level = nil,
+    -- If true, the win state will be reached when entering the next door, even if it is not the final level.
+    force_win = false,
 }
 
 --------------------------------------
@@ -202,6 +207,9 @@ level_sequence.index_of_level = index_of_level
 -- level: Level to find the next level of. If omitted, uses the current_level in the run_state.
 -- Return: Next level in the levels list.
 local function next_level(level)
+    if sequence_state.force_next_level then
+        return sequence_state.force_next_level
+    end
     level = level or run_state.current_level
     local index = index_of_level(level)
     if not index then return nil end
@@ -490,10 +498,12 @@ local function transition_increment_level_callback()
     end
     current_level = next_level()
     run_state.current_level = current_level
+    sequence_state.force_next_level = nil
     if sequence_callbacks.on_completed_level then
         sequence_callbacks.on_completed_level(previous_level, current_level)
     end
-    if not current_level then
+    if sequence_state.force_win or not current_level then
+        sequence_state.force_win = false
         run_state.run_started = false
         if sequence_callbacks.on_win then
             sequence_callbacks.on_win(run_state.attempts, state.time_total)
@@ -994,6 +1004,23 @@ local function convert_buffered_levels()
         sequence_state.buffered_levels = nil
         update_main_exits()
     end
+end
+
+-- Forces the selected level will be next in sequence. The sequence will continue from that level after
+-- completion. Set to nil to undo this and continue the sequence normally instead.
+level_sequence.force_next_level = function(next_level, update_doors)
+    if update_doors == nil then
+        update_doors = true
+    end
+    sequence_state.force_next_level = next_level
+    if update_doors then
+        update_state_and_doors()
+    end
+end
+
+-- If true, the win state will be reached when entering the next door, even if it is not the final level.
+level_sequence.force_win = function(force_win)
+    sequence_state.force_win = force_win
 end
 
 --------------------------------------
