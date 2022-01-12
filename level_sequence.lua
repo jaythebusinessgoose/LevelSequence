@@ -398,6 +398,7 @@ local function load_level(level, ctx)
         custom_levels.load_level(level.file_name, level.width, level.height, ctx, sequence_state.allowed_spawn_types)
         return
     end
+    has_reset = false
 	if loaded_level then
         if sequence_callbacks.on_level_will_unload then
             sequence_callbacks.on_level_will_unload(loaded_level)
