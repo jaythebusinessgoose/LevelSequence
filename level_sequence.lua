@@ -472,19 +472,6 @@ end
 ---- SHORTCUT LOADING
 --------------------------------------
 
--- Force the CO subtheme for a level.
--- If the theme of the level is not THEME.COSMIC_OCEAN, the subtheme will instead be reset to
--- a random subtheme.
---
--- level: A level object that should have a theme and co_subtheme values.
-local function load_co_subtheme(level)
-    if theme_for_level(level) == THEME.COSMIC_OCEAN and level.co_subtheme then
-        force_co_subtheme(level.co_subtheme)
-    else
-        force_co_subtheme(COSUBTHEME.RESET)
-    end
-end
-
 -- Load in an on-going run from a continue state.
 --
 -- level: The level that the player is currently on in the run.
@@ -495,7 +482,6 @@ local function load_run(level, attempts, time)
     run_state.current_level = level
     run_state.attempts = attempts
     run_state.total_time = time
-    load_co_subtheme(level)
 end
 
 -- Load in a shortcut to a level. Sets the initial_level to that level so that resets in hardcore
@@ -507,7 +493,6 @@ local function load_shortcut(level)
     run_state.initial_level = level
     run_state.attempts = 0
     run_state.total_time = 0
-    load_co_subtheme(level)
 end
 
 --------------------------------------
@@ -537,8 +522,6 @@ local function transition_increment_level_callback()
         if sequence_callbacks.on_win then
             sequence_callbacks.on_win(run_state.attempts, state.time_total)
         end
-    else
-        load_co_subtheme(current_level)
     end
 end
 
