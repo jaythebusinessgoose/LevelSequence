@@ -1,5 +1,6 @@
 local custom_levels = require("CustomLevels/custom_levels")
 custom_levels.set_directory("LevelSequence/CustomLevels")
+local BORDER_THEME, GROWABLE_SPAWN_TYPE = custom_levels.BORDER_THEME, custom_levels.GROWABLE_SPAWN_TYPE
 local button_prompts = require("ButtonPrompts/button_prompts")
 
 local level_sequence = {}
@@ -392,10 +393,37 @@ local has_reset = false
 -- level: Level to load.
 -- ctx: Context to load the level into.
 local function load_level(level, ctx)
+    local theme_properties
+    if level then
+        theme_properties = {
+            theme = level.theme,
+            width = level.width,
+            height = level.height,
+            subtheme = level.subtheme or level.co_subtheme,
+            border = level.border_type or level.border,
+            border_theme = level.border_theme,
+            border_entity_theme = level.border_entity_theme,
+            dont_spawn_effects = level.dont_spawn_effects,
+            dont_init = level.dont_init,
+            dont_loop = level.dont_loop,
+            dont_spawn_growables = level.dont_spawn_growables,
+            growables = level.growables or level.enabled_growables or level.growable_spawn_types,
+            dont_adjust_camera_focus = level.dont_adjust_camera_focus,
+            camera_bounds = level.camera_bounds,
+            dont_adjust_camera_bounds = level.dont_adjust_camera_bounds,
+            background_theme = level.background_theme,
+            background_texture_theme = level.background_texture_theme,
+            background_texture = level.background_texture,
+            floor_theme = level.floor_theme,
+            floor_texture_theme = level.floor_texture_theme,
+            floor_texture = level.floor_texture,
+            post_configure = level.post_configure,
+        }
+    end
     if loaded_level ~= nil and equal_levels(loaded_level, level) and not has_reset then
         level.load_next_room()
         custom_levels.unload_level()
-        custom_levels.load_level(level.file_name, level.width, level.height, ctx, sequence_state.allowed_spawn_types)
+        custom_levels.load_level_custom_theme(ctx, level.file_name, theme_properties)
         return
     end
     has_reset = false
@@ -414,7 +442,7 @@ local function load_level(level, ctx)
         sequence_callbacks.on_level_will_load(loaded_level)
     end
 	loaded_level.load_level()
-	custom_levels.load_level(level.file_name, level.width, level.height, ctx, sequence_state.allowed_spawn_types)
+    custom_levels.load_level_custom_theme(ctx, level.file_name, theme_properties)
 end
 
 local function on_reset_callback()
@@ -1096,5 +1124,8 @@ end, ON.LOAD)
 --------------------------------------
 ---- /STATE CALLBACKS
 --------------------------------------
+
+level_sequence.BORDER_THEME = custom_levels.BORDER_THEME
+level_sequence.GROWABLE_SPAWN_TYPE = custom_levels.GROWABLE_SPAWN_TYPE
 
 return level_sequence
