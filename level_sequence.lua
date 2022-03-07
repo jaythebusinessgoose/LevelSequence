@@ -226,14 +226,41 @@ end
 ---- THEMES
 --------------------------------------
 
+local function theme_for_co_subtheme(co_subtheme)
+    if co_subtheme == COSUBTHEME.DWELLING then
+        return THEME.DWELLING
+    elseif co_subtheme == COSUBTHEME.JUNGLE then
+        return THEME.JUNGLE
+    elseif co_subtheme == COSUBTHEME.VOLCANA then
+        return THEME.VOLCANA
+    elseif co_subtheme == COSUBTHEME.TIDE_POOL then
+        return THEME.TIDE_POOL
+    elseif co_subtheme == COSUBTHEME.TEMPLE then
+        return THEME.TEMPLE
+    elseif co_subtheme == COSUBTHEME.ICE_CAVES then
+        return THEME.ICE_CAVES
+    elseif co_subtheme == COSUBTHEME.NEO_BABYLON then
+        return THEME.NEO_BABYLON
+    elseif co_subtheme == COSUBTHEME.SUNKEN_CITY then
+        return THEME.SUNKEN_CITY
+    end
+end
+
 local function theme_for_level(level)
     if not level or not level.theme then return THEME.DWELLING end
     return level.theme
 end
 
-local function subtheme_for_level(level)
+local function co_subtheme_for_level(level)
     if not level or not level.co_subtheme then return COSUBTHEME.RESET end
     return level.co_subtheme
+end
+
+local function subtheme_for_level(level)
+    if not level then return nil end
+    if level.subtheme then return level.subtheme end
+    if level.co_subtheme then return theme_for_co_subtheme(level.co_subtheme) end
+    return nil
 end
 
 -- Gets the level that doors will lead to for a particular theme.
@@ -312,7 +339,7 @@ end
 -- theme: Theme that the door leads to.
 -- co_subtheme: Theme that the door leads to within the cosmic ocean.
 -- Return: Texture to use for doors leading to the theme.
-local function texture_for_theme(theme, co_subtheme)
+local function texture_for_theme(theme, subtheme)
     if theme == THEME.DWELLING then
         return TEXTURE.DATA_TEXTURES_FLOOR_CAVE_2
     elseif theme == THEME.VOLCANA then
@@ -348,23 +375,10 @@ local function texture_for_theme(theme, co_subtheme)
     elseif theme == THEME.ARENA then
         return TEXTURE.DATA_TEXTURES_FLOOR_CAVE_2
     elseif theme == THEME.COSMIC_OCEAN then
-        if co_subtheme == COSUBTHEME.DWELLING then
+        if subtheme == THEME.COSMIC_OCEAN then
             return TEXTURE.DATA_TEXTURES_FLOOR_CAVE_2
-        elseif co_subtheme == COSUBTHEME.JUNGLE then
-            return TEXTURE.DATA_TEXTURES_FLOOR_JUNGLE_1
-        elseif co_subtheme == COSUBTHEME.VOLCANA then
-            return TEXTURE.DATA_TEXTURES_FLOOR_VOLCANO_2
-        elseif co_subtheme == COSUBTHEME.TIDE_POOL then
-            return TEXTURE.DATA_TEXTURES_FLOOR_TIDEPOOL_3
-        elseif co_subtheme == COSUBTHEME.TEMPLE then
-            return TEXTURE.DATA_TEXTURES_FLOOR_TEMPLE_1
-        elseif co_subtheme == COSUBTHEME.ICE_CAVES then
-            return TEXTURE.DATA_TEXTURES_FLOOR_ICE_1
-        elseif co_subtheme == COSUBTHEME.NEO_BABYLON then
-            return TEXTURE.DATA_TEXTURES_FLOOR_BABYLON_1
-        elseif co_subtheme == COSUBTHEME.SUNKEN_CITY then
-            return TEXTURE.DATA_TEXTURES_FLOOR_SUNKEN_3
         end
+        return texture_for_theme(subtheme)
     end
     return TEXTURE.DATA_TEXTURES_FLOOR_CAVE_2
 end
@@ -399,7 +413,7 @@ local function load_level(level, ctx)
             theme = level.theme,
             width = level.width,
             height = level.height,
-            subtheme = level.subtheme or level.co_subtheme,
+            subtheme = level.subtheme or theme_for_co_subtheme(level.co_subtheme),
             border = level.border_type or level.border,
             border_theme = level.border_theme,
             border_entity_theme = level.border_entity_theme,
