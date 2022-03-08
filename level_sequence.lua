@@ -510,6 +510,8 @@ end
 
 -- Load the next level on transitions. If we were on the last level, call the on_win callback.
 local function transition_increment_level_callback()
+    if state.loading ~= 1 then return end
+    if state.screen_next ~= SCREEN.TRANSITION then return end
     local previous_level = run_state.current_level
     local current_level = previous_level
     if previous_level.is_multi_room and not previous_level.should_complete then
@@ -1077,7 +1079,7 @@ level_sequence.activate = function()
     button_prompts.activate()
     add_callback(set_callback(on_reset_callback, ON.RESET))
     add_callback(set_callback(pre_load_level_files_callback, ON.PRE_LOAD_LEVEL_FILES))
-    add_callback(set_callback(transition_increment_level_callback, ON.TRANSITION))
+    add_callback(set_callback(transition_increment_level_callback, ON.LOADING))
     add_callback(set_callback(save_time_on_reset_callback, ON.RESET))
     add_callback(set_callback(save_time_on_transition_callback, ON.TRANSITION))
     add_callback(set_callback(load_time_after_level_generation_callback, ON.POST_LEVEL_GENERATION))
