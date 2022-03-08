@@ -1,4 +1,5 @@
 # LevelSequence
+
 Tool to help build out a sequence of custom levels in a Spelunky 2 mod.
 
 This tool uses the CustomLevels tool to load each level in a series of levels, and includes utilities for spawning shortcut doors.
@@ -22,8 +23,6 @@ A simple example of how to format the level files and how to set up the sequence
 A full mod that uses more advanced features of LevelSequence.
 
 ### Configuration
-
-Due to the way level files are loaded in, some extra configuration is required if the LevelSequence package is relocated. If it is anywhere other than the root directory of the mod, or has a name other than LevelSequence, `set_directory` must be called, passing the path to the directory within the mod folder including the directory name. Eg, for `MyCoolMod/SweetFolder/LevelSequence/level_sequence.lua` call `level_sequence.set_directory('SweetFolder/LevelSequence')`.
 
 * `activate()` \
 Call this method to activate the script.
@@ -53,11 +52,11 @@ Title of the level, displayed when reading signs for shortcuts to the level when
 * `file_name` string \
 Name of the `.lvl` file in the `Data/Levels` directory that will be loaded for this level.
 
-* `width` int \
-Width of the level in number of subrooms. The maximum allowed width is `8`. The level will not generate properly if attempting to use a width greater than 8.
+* `width` (optional) int \
+Width of the level in number of subrooms. The maximum allowed width is `8`. The level will not generate properly if attempting to use a width greater than 8. This is not required if the level size is defined in the level file, except for some themes where it is required.
 
-* `height` int \
-Height of the level in number of subrooms. The maximum allowed height is `15`. The level will not generate properly if attempting to use a height greater than 15.
+* `height` (optional) int \
+Height of the level in number of subrooms. The maximum allowed height is `15`. The level will not generate properly if attempting to use a height greater than 15. This is not required if the level size is defined in the level file, except for some themes where it is required.
 
 * `load_level` function \
 Function that will be called when the level loads to be generated. Within this function is where callbacks, custom tile codes, and other level state should be set up. Any callbacks set up here should be stored to be unloaded.
@@ -69,7 +68,7 @@ Note: Even when resetting the same level, this will be called before the same le
 * `theme` THEME (int) \
 Theme that the level will load with. Also used for texturing shortcut doors.
 
-* `co_subtheme` (optional) COSUBTHEME (int) \
+* `subtheme` (optional) THEME (int) \
 Theme that Cosmic Ocean levels will load with if the THEME is THEME.COSMIC_OCEAN. If this is not set, the Cosmic Ocean will load in a random theme.
 
 * `world` (optional) int \
@@ -78,6 +77,54 @@ The world that will be displayed in the HUD. If not set, defaults to the index o
 * `level` (optional) int \
 The level that will be displayed in the HUD. If not set, defaults to `1`.
 
+
+Custom theming properties:
+
+* `border_type` BORDER_THEME \
+Enum value that configures what type of border to use.
+* `growable_spawn_types` GROWABLE_SPAWN_TYPE \
+Enum bitmask of the types of growables that will spawn.
+* `background_theme` THEME \
+Customize the background to look like the background of `background_theme`.
+* `floor_theme` THEME \
+Customize the floor textures to look like the floors of `floor_theme`.
+* `post_configure` function(CustomTheme, Subtheme) \
+Function that allows additional configuration of the CustomTheme that was created from the properties.
+
+
+Additional theming:
+* `border_theme` THEME \
+Allows more fine-grained theming compared to what `border_type` allows, theming the border to match the theme.
+* `border_entity_theme` THEME \
+Allows more fine-grained theming compared to what `border_type` allows, theming the entity of the border to match the theme.
+* `background_texture_theme` THEME \
+Allows more fine-grained theming of the background texture.
+* `background_texture` TEXTURE \
+Even more fine-grained than `background_texture_theme`, only overriding the texture itself.
+* `floor_texture_theme` THEME \
+Themes the floor texture without also affecting some other things that `floor_theme` affects.
+* `floor_texture` TEXTURE \
+Override the floor textures with a specific texture.
+
+
+Additional fields:
+* `dont_spawn_effects` Bool \
+Some spawn effects for the base theme may be undesired, so this will disable them.
+* `dont_init` Bool \
+Some initialization properties for the base theme may be undesired, so this will disable them.
+* `dont_spawn_growables` Bool \
+Like using `growable_spawn_types = GROWABLE_SPAWN_TYPE.NONE`, except also will not spawn sliding doors under slidingdoor_ceiling.
+* `dont_loop` Bool \
+This will allow cosmic ocean themes not to loop. (Untested)
+* `loop` Bool \
+This will allow non-cosmic ocean themes to loop. (Untested)
+* `dont_adjust_camera_focus` Bool \
+The camera normally focuses on the player at the start of the level. This disables that for customizable behavior.
+* `dont_adjust_camera_bounds` Bool \
+The camera bounds are normally changed for cosmic ocean themes. This disables that for customizable behavior.
+* `camera_bounds` AABB \
+Custom camera bounds to initialize the level with.
+
 Example:
 
 ```
@@ -85,8 +132,6 @@ local level_1 = {
     identifier = 'dwelling_puzzles',
     title = 'Dwelling Puzzles',
     file_name = 'dwelling_puzzle1.lvl',
-    width = 5,
-    height = 4,
     load_level = ...,
     unload_level = ...,
     theme = THEME.DWELLING,
@@ -96,6 +141,55 @@ level_sequence.set_levels({level_1})
 ```
 
 Note: The levels that were set will not change while a run is in progress. Instead, they will be remembered and set when going back to the camp.
+
+### BORDER_THEME
+
+The BORDER_THEME enum configures both the type of border and the border entity.
+
+* `DEFAULT` \
+Defaults to the preferred border properties of the base theme.
+* `HARD_FLOOR` \
+Normal border as found in most themes.
+* `SUNKEN_CITY` \
+Normal border but with sunken city themed texture.
+* `NEO_BABYLON` \
+Normal border but with neo babylon themed texture.
+* `ICE_CAVES` \
+Border on top and both edges, but not on bottom, as found in the Ice Caves.
+* `ICE_SUNKEN` \
+Ice caves border, but with sunken city themed texture.
+* `ICE_BABY` \
+Ice caves border, but with neo babylon themed texture.
+* `DUAT` \
+Duat fog borders on sides with invisible border on top and bottom.
+* `TIAMAT` \
+Neo babylon themed borders with lasers embeded, as found in Tiamat's Throne.
+* `COSMIC_OCEAN` \
+Looping border, as found in Cosmic Ocean.
+* `NONE` \
+No border, the player may die when leaving the bounds.
+
+### GROWABLE_SPAWN_TYPE
+
+The GROWABLE_SPAWN_TYPE enum configures which growables will grow. Others will be left with just the root objects spawned.
+
+Growables are growable_vines, growable_poles, chain_ceiling, and chain_and_blocks_ceiling.
+
+* `NONE` \
+Do not spawn any growables.
+* `CHAINS` \
+Spawn chains from chain_ceiling and chains and blocks from chain_and_blocks_ceiling.
+* `TIDE_POOL_POLES` \
+Spawn poles up from growable_poles.
+* `VINES` \
+Spawn vines down from growable_vines.
+
+The GROWABLE_SPAWN_TYPE is a bitmask, so multiple spawn types can be chained, such as:
+GROWABLE_SPAWN_TYPE.CHAINS | GROWABLE_SPAWN_TYPE.VINES.
+
+The default, GROWABLE_SPAWN_TYPE.ALL, spawns all growables.
+
+Note: Due to technical limitations, chains and tide pool poles cannot be spawned without also spawning vines.
 
 ### Configuration
 
@@ -414,3 +508,9 @@ Olmec is also crashing during the cutscene, you may need to spawn Olmec or disab
 ## Cosmic Ocean
 
 Haven't tested much. Loaded a level in and it seems to load fine in any subtheme. There are some weird things that go on if there isn't empty space along the looping edges.
+
+Spawning growables in the CO sometimes causes crashes.
+
+CO levels must have an exit door.
+
+CO levels must be at least 3x3.
