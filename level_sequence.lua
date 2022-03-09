@@ -460,12 +460,12 @@ end
 -- ctx: Context to load levels into.
 local function pre_load_level_files_callback(ctx)
     -- Unload any loaded level when entering the base camp or the title screen.
-	if state.theme == THEME.BASE_CAMP or state.theme == 0 then
-		load_level(nil)
-		return
-	end
-	local level = run_state.current_level
-	load_level(level, ctx)
+    if state.screen == SCREEN.CAMP or state.screen == SCREEN.TITLE or state.theme == 0 then
+        load_level(nil)
+        return
+    end
+    local level = run_state.current_level
+    load_level(level, ctx)
 end
 
 
@@ -546,7 +546,7 @@ end
 -- Update the display of the world-level to the desired display instead of using the
 -- world-level we set for the theme to load properly.
 local function update_state_and_doors()
-    if state.theme == THEME.BASE_CAMP then return end
+    if state.screen ~= SCREEN.LEVEL then return end
     local current_level = run_state.current_level
     local next_level_file = next_level()
     if not current_level then return end
@@ -599,7 +599,7 @@ end
 -- Since we are keeping track of time for the entire run even through deaths and resets, we must track
 -- what the time was on resets and level transitions.
 local function save_time_on_reset_callback()
-    if state.theme == THEME.BASE_CAMP or not run_state.run_started then return end
+    if state.screen ~= SCREEN.LEVEL or not run_state.run_started then return end
     if sequence_state.keep_progress then
         -- Save the time on reset so we can keep the timer going.
         run_state.total_time = state.time_total
@@ -612,20 +612,20 @@ end
 -- Save the time of the run on transitions so that the run state is correct on starting
 -- the next level.
 local function save_time_on_transition_callback()
-    if state.theme == THEME.BASE_CAMP or not run_state.run_started then return end
+    if state.screen_last ~= SCREEN.LEVEL or not run_state.run_started then return end
     run_state.total_time = state.time_total
 end
 
 -- Set the time in the state so it shows up in the player's HUD.
 local function load_time_after_level_generation_callback()
-    if state.theme == THEME.BASE_CAMP then return end
+    if state.screen ~= SCREEN.LEVEL then return end
     state.time_total = run_state.total_time
 end
 
 -- Increase the attempts on level start, and mark the run as started on the first level start so
 -- we can begin keeping track of the time.
 local function start_level_callback()
-    if state.theme == THEME.BASE_CAMP then return end
+    if state.screen ~= SCREEN.LEVEL then return end
     run_state.run_started = true
     run_state.attempts = run_state.attempts + 1
     if sequence_callbacks.on_level_start then
@@ -905,7 +905,7 @@ end
 -- a 1-block radius of either the door or the sign.
 local function update_current_entry()
     if #players < 1 then return end
-    if state.theme ~= THEME.BASE_CAMP then return end
+    if state.screen ~= SCREEN.CAMP then return end
     local player = players[1]
     for _, shortcut in pairs(shortcuts) do
         if (shortcut.door and distance(player.uid, shortcut.door.uid) <= 1) or
@@ -939,7 +939,7 @@ end
 -- Called on every GAMEFRAME, displays a toast if the player presses the door button while standing
 -- next to a shortcut sign.
 local function handle_sign_toasts()
-    if state.theme ~= THEME.BASE_CAMP then return end
+    if state.screen ~= SCREEN.CAMP then return end
     if #players < 1 then return end
     local player = players[1]
 
@@ -1007,7 +1007,7 @@ level_sequence.set_levels = function(levels)
     end
 
     -- Make sure to only update the levels while not in a run.
-    if state.theme == THEME.BASE_CAMP or state.theme == 0 then
+    if state.screen == SCREEN.CAMP or state.screen == SCREEN.TITLE or state.screen == SCREEN.INTRO or state.screen == SCREEN.MENU or state.theme == 0 then
         sequence_state.levels = new_levels
         sequence_state.buffered_levels = nil
         update_main_exits()
