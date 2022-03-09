@@ -88,6 +88,8 @@ Enum bitmask of the types of growables that will spawn.
 Customize the background to look like the background of `background_theme`.
 * `floor_theme` THEME \
 Customize the floor textures to look like the floors of `floor_theme`.
+* `music_theme` THEME \
+Customize the music to play the music for `music_theme`.
 * `post_configure` function(CustomTheme, Subtheme) \
 Function that allows additional configuration of the CustomTheme that was created from the properties.
 

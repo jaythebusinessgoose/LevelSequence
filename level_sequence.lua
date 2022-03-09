@@ -555,6 +555,12 @@ local function update_state_and_doors()
 	state.world = current_level.world or index_of_level(current_level)
     state.level = current_level.level or 1
 
+    if current_level.music then
+        state.theme = current_level.music
+    elseif current_level.music_theme then
+        state.theme = current_level.music_theme
+    end
+
     if sequence_state.keep_progress then
 		-- Setting the _start properties of the state will ensure that Instant Restarts will take
         -- the player back to the current level, instead of going to the starting level.
