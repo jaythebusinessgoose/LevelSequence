@@ -208,6 +208,16 @@ Default value: true
     level_sequence.set_keep_progress(false)
     ```
 
+* `set_checkpoint_level(level)` \
+Sets a level to reset at upon death instead of resetting at the current level (keep_progress) or the initial level(keep_progress off).
+\
+Set to `nil` to clear the checkpoint and revert to the default behavior.
+
+    Example:
+    ```
+    level_sequence.set_checkpoint_level(volcana_level)
+    ```
+
 ## Entrance Doors
 
 By default, entrance doors are hidden since they can look strange in many custom levels. This can be configured by calling the

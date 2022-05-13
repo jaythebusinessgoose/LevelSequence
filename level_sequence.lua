@@ -34,6 +34,8 @@ local sequence_callbacks = {
     on_post_level_generation = nil,
     -- Called when resetting the run if keep progress is not enabled.
     on_reset_run = nil,
+    -- Called when resetting and going back to the last checkpoint.
+    on_reset_to_checkpoint = nil,
     -- Called in the transition after a level has been completed.
     on_completed_level = nil,
     -- Called in the transition after the last level has been completed.
@@ -73,6 +75,15 @@ end
 -- This callback will never be called if keep_progress is true.
 level_sequence.set_on_reset_run = function(on_reset_run)
     sequence_callbacks.on_reset_run = on_reset_run
+end
+
+-- Called when resetting and going back to the last checkpoint.
+--
+-- Callback signature:
+--   checkpoint_level: Level that has been configured as a checkpoint and is being loaded.
+--   previous_level: Level that was being played before this reset.
+level_sequence.set_on_reset_to_checkpoint = function(on_reset_to_checkpoint)
+    sequence_callbacks.on_reset_to_checkpoint = on_reset_to_checkpoint
 end
 
 -- Set the callback that will be called when a level is completed.
@@ -124,6 +135,7 @@ end
 local run_state = {
     initial_level = nil,
     current_level = nil,
+    checkpoint_level = nil,
     attempts = 0,
     total_time = 0,
     run_started = false,
@@ -141,6 +153,7 @@ level_sequence.get_run_state = function()
     return {
         initial_level = run_state.initial_level,
         current_level = run_state.current_level,
+        checkpoint_level = run_state.checkpoint_level,
         attempts = run_state.attempts,
         total_time = state.time_total,
     }
@@ -160,6 +173,16 @@ end
 -- keep_progress: Whether or not to keep progress on resets.
 level_sequence.set_keep_progress = function(keep_progress)
     sequence_state.keep_progress = keep_progress
+end
+
+-- Set a level that the player should be reset to upon death instead of the current level (if keep progress
+-- is on) or the first level (keep progress not on).
+--
+-- Set to `nil` to clear and return to the default behavior.
+--
+-- level: level to reset to on death/instant restart.
+function level_sequence.set_checkpoint_level(level)
+    run_state.checkpoint_level = level
 end
 
 -- Compares two levels to see if they are the same level. Compares identifiers if the objects are not
@@ -534,7 +557,13 @@ end
 
 -- Reset the run state if the game is reset and keep progress is not enabled.
 local function reset_run_if_hardcore()
-    if not sequence_state.keep_progress then
+    if run_state.checkpoint_level then
+        local prev_current_level = run_state.current_level
+        run_state.current_level = run_state.checkpoint_level
+        if sequence_callbacks.on_reset_to_checkpoint then
+            sequence_callbacks.on_reset_to_checkpoint(run_state.checkpoint_level, prev_current_level)
+        end
+    elseif not sequence_state.keep_progress then
         run_state.current_level = run_state.initial_level
         run_state.attempts = 0
         if sequence_callbacks.on_reset_run then
@@ -561,7 +590,13 @@ local function update_state_and_doors()
         state.theme = current_level.music_theme
     end
 
-    if sequence_state.keep_progress then
+    if run_state.checkpoint_level then
+		-- Setting the _start properties of the state will ensure that Instant Restarts will take
+        -- the player back to the checkpoint level, instead of going to the starting level.
+		state.world_start = world_for_level(run_state.checkpoint_level)
+		state.level_start = level_for_level(run_state.checkpoint_level)
+		state.theme_start = theme_for_level(run_state.checkpoint_level)
+    elseif sequence_state.keep_progress then
 		-- Setting the _start properties of the state will ensure that Instant Restarts will take
         -- the player back to the current level, instead of going to the starting level.
 		state.world_start = world_for_level(current_level)
@@ -606,7 +641,7 @@ end
 -- what the time was on resets and level transitions.
 local function save_time_on_reset_callback()
     if state.screen ~= SCREEN.LEVEL or not run_state.run_started then return end
-    if sequence_state.keep_progress then
+    if sequence_state.keep_progress or run_state.checkpoint_level then
         -- Save the time on reset so we can keep the timer going.
         run_state.total_time = state.time_total
     else
