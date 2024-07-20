@@ -137,6 +137,7 @@ end
 
 local run_state = {
     initial_level = nil,
+    previous_level = nil,
     current_level = nil,
     checkpoint_level = nil,
     attempts = 0,
@@ -266,6 +267,20 @@ end
 local function theme_for_level(level)
     if not level or not level.theme then return THEME.DWELLING end
     return level.theme
+end
+
+local function floor_theme_for_level(level)
+    if not level then return THEME.DWELLING end
+    if level.floor_theme then return level.floor_theme end
+    if level.theme then return level.theme end
+    return THEME.DWELLING
+end
+
+local function background_theme_for_level(level)
+    if not level then return THEME.DWELLING end
+    if level.background_theme then return level.background_theme end
+    if level.theme then return level.theme end
+    return THEME.DWELLING
 end
 
 local function co_subtheme_for_level(level)
@@ -400,12 +415,99 @@ local function texture_for_theme(theme, subtheme)
     return TEXTURE.DATA_TEXTURES_FLOOR_CAVE_2
 end
 
+-- Gets the texture that should be used to texture floors for a particular theme.
+--
+-- theme: Theme for floor texture.
+-- co_subtheme: Subtheme if theme is cosmic ocean.
+-- Return: Texture to use for floors in the theme.
+local function floor_texture_for_theme(theme, subtheme)
+    if theme == THEME.DWELLING or theme == THEME.ARENA then
+        return TEXTURE.DATA_TEXTURES_FLOOR_CAVE_0
+    elseif theme == THEME.VOLCANA then
+        return TEXTURE.DATA_TEXTURES_FLOOR_VOLCANO_0
+    elseif theme == THEME.JUNGLE or theme == THEME.OLMEC then
+        return TEXTURE.DATA_TEXTURES_FLOOR_JUNGLE_0
+    elseif theme == THEME.TIDE_POOL or theme == THEME.ABZU or theme == THEME.TIAMAT then
+        return TEXTURE.DATA_TEXTURES_FLOOR_TIDEPOOL_0
+    elseif theme == THEME.TEMPLE or theme == THEME.CITY_OF_GOLD or theme == THEME.DUAT then
+        return TEXTURE.DATA_TEXTURES_FLOOR_TEMPLE_0
+    elseif theme == THEME.ICE_CAVES then
+        return TEXTURE.DATA_TEXTURES_FLOOR_ICE_0
+    elseif theme == THEME.NEO_BABYLON then
+        return TEXTURE.DATA_TEXTURES_FLOOR_BABYLON_0
+    elseif theme == THEME.SUNKEN_CITY or theme == THEME.HUNDUN then
+        return TEXTURE.DATA_TEXTURES_FLOOR_SUNKEN_0
+    elseif theme == THEME.EGGPLANT_WORLD then
+        return TEXTURE.DATA_TEXTURES_FLOOR_EGGPLANT_0
+    elseif theme == THEME.BASE_CAMP then
+        return TEXTURE.DATA_TEXTURES_FLOOR_SURFACE_0
+    elseif theme == THEME.COSMIC_OCEAN then
+        if subtheme == THEME.COSMIC_OCEAN then
+            return TEXTURE.DATA_TEXTURES_FLOOR_CAVE_0
+        end
+        return texture_for_theme(subtheme)
+    end
+    return TEXTURE.DATA_TEXTURES_FLOOR_CAVE_0
+end
+
+local function background_texture_for_theme(theme, subtheme)
+    if theme == THEME.DWELLING or theme == THEME.ARENA then
+        return TEXTURE.DATA_TEXTURES_BG_CAVE_0
+    elseif theme == THEME.VOLCANA then
+        return TEXTURE.DATA_TEXTURES_BG_VOLCANO_0
+    elseif theme == THEME.JUNGLE then
+        return TEXTURE.DATA_TEXTURES_BG_JUNGLE_0
+    elseif theme == THEME.OLMEC then
+        return TEXTURE.DATA_TEXTURES_BG_STONE_0
+    elseif theme == THEME.TIDE_POOL or theme == THEME.ABZU or theme == THEME.TIAMAT then
+        return TEXTURE.DATA_TEXTURES_BG_TIDEPOOL_0
+    elseif theme == THEME.TEMPLE then
+        return TEXTURE.DATA_TEXTURES_BG_TEMPLE_0
+    elseif theme == THEME.CITY_OF_GOLD then
+        return TEXTURE.DATA_TEXTURES_BG_GOLD_0
+    elseif theme == THEME.DUAT then
+        return TEXTURE.DATA_TEXTURES_BG_DUAT_0
+    elseif theme == THEME.ICE_CAVES then
+        return TEXTURE.DATA_TEXTURES_BG_ICE_0
+    elseif theme == THEME.NEO_BABYLON then
+        return TEXTURE.DATA_TEXTURES_BG_BABYLON_0
+    elseif theme == THEME.SUNKEN_CITY or theme == THEME.HUNDUN then
+        return TEXTURE.DATA_TEXTURES_BG_SUNKEN_0
+    elseif theme == THEME.EGGPLANT_WORLD then
+        return TEXTURE.DATA_TEXTURES_BG_EGGPLANT_0
+    elseif theme == THEME.BASE_CAMP then
+        return TEXTURE.DATA_TEXTURES_BG_CAVE_0
+    elseif theme == THEME.COSMIC_OCEAN then
+        if subtheme == THEME.COSMIC_OCEAN then
+            return TEXTURE.DATA_TEXTURES_BG_CAVE_0
+        end
+        return texture_for_theme(subtheme)
+    end
+    return TEXTURE.DATA_TEXTURES_BG_CAVE_0
+end
+
 -- Gets the texture that should be used to texture doors for a particular level.
 --
 -- level: Level that the door leads to.
 -- Return: Texture to use for doors leading to the level.
 local function texture_for_level(level)
     return texture_for_theme(theme_for_level(level), subtheme_for_level(level))
+end
+
+-- Gets the texture that should be used to texture floors for a particular level.
+--
+-- level: Level to texture.
+-- Return: Texture to use for floors in the level.
+local function floor_texture_for_level(level)
+    return floor_texture_for_theme(floor_theme_for_level(level))
+end
+
+-- Gets the texture that should be used to texture backgrounds for a particular level.
+--
+-- level: Level to texture.
+-- Return: Texture to use for backgrounds in the level.
+local function background_texture_for_level(level)
+    return background_texture_for_theme(background_theme_for_level(level))
 end
 
 --------------------------------------
@@ -510,6 +612,7 @@ end
 -- time: The amount of time the player has spent in the run.
 local function load_run(level, attempts, time)
     run_state.initial_level = sequence_state.levels[1]
+    run_state.previous_level = nil
     run_state.current_level = level
     run_state.attempts = attempts
     run_state.total_time = time
@@ -520,6 +623,7 @@ end
 --
 -- level: The level that the shortcut leads to.
 local function load_shortcut(level)
+    run_state.previous_level = nil
     run_state.current_level = level
     run_state.initial_level = level
     run_state.attempts = 0
@@ -544,6 +648,7 @@ local function transition_increment_level_callback()
         return
     end
     current_level = next_level()
+    run_state.previous_level = run_state.current_level
     run_state.current_level = current_level
     sequence_state.force_next_level = nil
     if sequence_callbacks.on_completed_level then
@@ -562,11 +667,13 @@ end
 local function reset_run_if_hardcore()
     if run_state.checkpoint_level then
         local prev_current_level = run_state.current_level
+        run_state.previous_level = nil
         run_state.current_level = run_state.checkpoint_level
         if sequence_callbacks.on_reset_to_checkpoint then
             sequence_callbacks.on_reset_to_checkpoint(run_state.checkpoint_level, prev_current_level)
         end
     elseif not sequence_state.keep_progress then
+        run_state.previous_level = nil
         run_state.current_level = run_state.initial_level
         run_state.attempts = 0
         if sequence_callbacks.on_reset_run then
@@ -636,6 +743,11 @@ end
 set_post_entity_spawn(function(entity)
     if sequence_state.disable_transition_decoration_fix then return end
     if not run_state.run_started then return end
+    if entity.type.id == ENT_TYPE.FLOOR_TUNNEL_NEXT then
+        entity:set_texture(floor_texture_for_level(run_state.current_level))
+    else
+        entity:set_texture(floor_texture_for_level(run_state.previous_level))
+    end
     entity:set_post_floor_update(function(floor)
         local sides = {
             {deco = floor.deco_top, side = FLOOR_SIDE.TOP, x = 0, y = 1},
@@ -646,6 +758,11 @@ set_post_entity_spawn(function(entity)
         local x, y, layer = get_position(floor.uid)
         for _, side in pairs(sides) do
             if side.deco ~= -1 then
+                if floor.type.id == ENT_TYPE.FLOOR_TUNNEL_NEXT then
+                    get_entity(side.deco):set_texture(floor_texture_for_level(run_state.current_level))
+                else
+                    get_entity(side.deco):set_texture(floor_texture_for_level(run_state.previous_level))
+                end
                 local neighbor_uid = get_grid_entity_at(x + side.x, y + side.y, layer)
                 if neighbor_uid ~= -1 then
                     local neighbor = get_entity(neighbor_uid)
@@ -707,6 +824,7 @@ end
 local function reset_on_camp_callback()
     run_state.run_started = false
     run_state.attempts = 0
+    run_state.previous_level = nil
     run_state.current_level = nil
     run_state.total_time = 0
 end
