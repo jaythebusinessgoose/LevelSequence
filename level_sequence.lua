@@ -19,6 +19,9 @@ local sequence_state = {
     force_next_level = nil,
     -- If true, the win state will be reached when entering the next door, even if it is not the final level.
     force_win = false,
+    -- If true, the fix for custom theme transition tiles will be disabled, and there may be edge decorations
+    -- between tiles for levels of the same theme.
+    disable_transition_decoration_fix = false,
 }
 
 --------------------------------------
@@ -629,6 +632,33 @@ local function update_state_and_doors()
     end
 end
 
+-- Fix borders of transition tiles.
+set_post_entity_spawn(function(entity)
+    if sequence_state.disable_transition_decoration_fix then return end
+    if not run_state.run_started then return end
+    entity:set_post_floor_update(function(floor)
+        local sides = {
+            {deco = floor.deco_top, side = FLOOR_SIDE.TOP, x = 0, y = 1},
+            {deco = floor.deco_bottom, side = FLOOR_SIDE.BOTTOM, x = 0, y = -1},
+            {deco = floor.deco_right, side = FLOOR_SIDE.RIGHT, x = 1, y = 0},
+            {deco = floor.deco_left, side = FLOOR_SIDE.LEFT, x = -1, y = 0},
+        }
+        local x, y, layer = get_position(floor.uid)
+        for _, side in pairs(sides) do
+            if side.deco ~= -1 then
+                local neighbor_uid = get_grid_entity_at(x + side.x, y + side.y, layer)
+                if neighbor_uid ~= -1 then
+                    local neighbor = get_entity(neighbor_uid)
+                    if neighbor:get_texture() == floor:get_texture() then
+                        floor:remove_decoration(side.side)
+                    end
+                end
+            end
+        end
+        return true
+    end)
+end, SPAWN_TYPE.ANY, MASK.FLOOR, {ENT_TYPE.FLOOR_TUNNEL_NEXT, ENT_TYPE.FLOOR_TUNNEL_CURRENT})
+
 --------------------------------------
 ---- /LEVEL TRANSITIONS
 --------------------------------------
@@ -1081,6 +1111,12 @@ end
 -- If true, the win state will be reached when entering the next door, even if it is not the final level.
 level_sequence.force_win = function(force_win)
     sequence_state.force_win = force_win
+end
+
+-- If true, the fix for custom theme transition tiles will be disabled, and there may be edge decorations
+-- between tiles for levels of the same theme.
+level_sequence.disable_transition_decoration_fix = function(disable_transition_decoration_fix)
+    sequence_state.disable_transition_decoration_fix = disable_transition_decoration_fix
 end
 
 --------------------------------------
