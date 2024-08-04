@@ -353,7 +353,7 @@ local function world_for_theme(theme)
 	elseif theme == THEME.ARENA then
 		return 1
 	elseif theme == THEME.COSMIC_OCEAN then
-		return 7
+		return 8
 	end
 	return 1
 end
@@ -687,7 +687,6 @@ end
 local function update_state_and_doors()
     if state.screen ~= SCREEN.LEVEL then return end
     local current_level = run_state.current_level
-    local next_level_file = next_level()
     if not current_level then return end
 
     -- This doesn't affect anything except what is displayed in the UI.
@@ -698,6 +697,8 @@ local function update_state_and_doors()
         state.theme = current_level.music
     elseif current_level.music_theme then
         state.theme = current_level.music_theme
+    else
+        state.theme = current_level.theme
     end
 
     if run_state.checkpoint_level then
@@ -713,26 +714,6 @@ local function update_state_and_doors()
 		state.level_start = level_for_level(current_level)
 		state.theme_start = theme_for_level(current_level)
     end
-
-	local exit_uids = get_entities_by_type(ENT_TYPE.FLOOR_DOOR_EXIT)
-	for _, exit_uid in pairs(exit_uids) do
-		local exit_ent = get_entity(exit_uid)
-		if exit_ent then
-			exit_ent.entered = false
-			exit_ent.special_door = true
-			if not next_level_file then
-				-- The door in the final level will take the player back to the camp.
-				exit_ent.world = 1
-				exit_ent.level = 1
-				exit_ent.theme = THEME.BASE_CAMP
-			else
-				-- Sets the theme of the door to the theme of the next level we will load.
-				exit_ent.world = world_for_level(next_level_file)
-				exit_ent.level = level_for_level(next_level_file)
-				exit_ent.theme = next_level_file.theme
-			end
-		end
-	end
 
     if sequence_callbacks.on_post_level_generation then
         sequence_callbacks.on_post_level_generation(current_level)
