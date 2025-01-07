@@ -1168,6 +1168,86 @@ level_sequence.levels = function()
     return levels
 end
 
+local function setup_level(level_info)
+    local level_state = {
+        loaded = false,
+        callbacks = {},
+        screen_callbacks = {},
+        vanilla_sound_callbacks = {},
+        entity_callbacks = {},
+    }
+
+    function level_info.attach_callback(callback_id)
+        level_state.callbacks[#level_state.callbacks+1] = callback_id
+    end
+
+    function level_info.attach_screen_callback(screen_id, callback_id)
+        level_state.screen_callbacks[#level_state.screen_callbacks+1] = { screen_id = screen_id, id = callback_id }
+    end
+
+    function level_info.attach_vanilla_sound_callback(callback_id)
+        level_state.vanilla_sound_callbacks[#level_state.vanilla_sound_callbacks+1] = callback_id
+    end
+
+    function level_info.attach_entity_callback(entity_id, callback_id)
+        level_state.entity_callbacks[#level_state.entity_callbacks+1] = { entity_id = entity_id, id = callback_id }
+    end
+
+    function level_info.load_level()
+        if level_state.loaded then return end
+        level_state.loaded = true
+
+        if level_info.on_load_level then
+            level_info.on_load_level()
+        end
+    end
+
+    function level_info.unload_level()
+        if not level_state.loaded then return end
+
+        local callbacks_to_clear = level_state.callbacks
+        local screen_callbacks_to_clear = level_state.screen_callbacks
+        local vanilla_sound_callbacks_to_clear = level_state.vanilla_sound_callbacks
+        local entity_callbacks_to_clear = level_state.entity_callbacks
+        level_state.loaded = false
+        level_state.callbacks = {}
+        level_state.screen_callbacks = {}
+        level_state.vanilla_sound_callbacks = {}
+        level_state.entity_callbacks = {}
+
+        for _, callback in pairs(callbacks_to_clear) do
+            clear_callback(callback)
+        end
+        for _, callback in pairs(screen_callbacks_to_clear) do
+            clear_screen_callback(callback.screen_id, callback.id)
+        end
+        for _, callback in pairs(vanilla_sound_callbacks_to_clear) do
+            clear_vanilla_sound_callback(callback)
+        end
+        for _, callback in pairs(entity_callbacks_to_clear) do
+            clear_entity_callback(callback.entity_id, callback.id)
+        end
+    end
+end
+
+level_sequence.load_levels = function(level_configuration_path)
+    if not level_configuration_path then
+        level_configuration_path = "level_configuration.ls"
+    end
+    local file = io.open_mod(level_configuration_path)
+    if file then
+        local data = json.decode(file:read("*all"))
+        file:close()
+        local sequence = data.sequence
+        for _, level in pairs(sequence) do
+            setup_level(level)
+        end
+        level_sequence.set_levels(sequence)
+    else
+        print("Configuration file " .. level_configuration_path .. " does not exist.")
+    end
+end
+
 -- Set the levels that will be loaded. If currently in a run, the actual level state will not
 -- be updated until back in the camp.
 level_sequence.set_levels = function(levels)
