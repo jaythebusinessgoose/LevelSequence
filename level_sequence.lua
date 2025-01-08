@@ -22,6 +22,8 @@ local sequence_state = {
     -- If true, the fix for custom theme transition tiles will be disabled, and there may be edge decorations
     -- between tiles for levels of the same theme.
     disable_transition_decoration_fix = false,
+    -- If true, a toast will display the current level name at the start of each level.
+    show_toast = false,
 }
 
 --------------------------------------
@@ -583,6 +585,9 @@ local function load_level(level, ctx)
         sequence_callbacks.on_level_will_load(loaded_level)
     end
 	loaded_level.load_level()
+    if sequence_state.show_toast then
+        toast(loaded_level.name)
+    end
     custom_levels.load_level_custom_theme(ctx, level.file_name, theme_properties)
 end
 
@@ -1395,6 +1400,11 @@ end
 -- between tiles for levels of the same theme.
 level_sequence.disable_transition_decoration_fix = function(disable_transition_decoration_fix)
     sequence_state.disable_transition_decoration_fix = disable_transition_decoration_fix
+end
+
+-- If true, a toast will display the current level name at the start of each level.
+function level_sequence.set_show_toast(show_toast)
+    sequence_state.show_toast = show_toast
 end
 
 --------------------------------------
