@@ -1347,6 +1347,24 @@ level_sequence.set_levels = function(levels)
     end
 end
 
+level_sequence.add_level = function(level)
+    local old_levels = sequence_state.buffered_levels or sequence_state.levels or {}
+    local new_levels = {}
+    for index, level in pairs(old_levels) do
+        new_levels[index] = level
+    end
+    new_levels[#new_levels+1] = level
+
+    -- Make sure to only update the levels while not in a run.
+    if state.screen == SCREEN.CAMP or state.screen == SCREEN.TITLE or state.screen == SCREEN.INTRO or state.screen == SCREEN.MENU or state.theme == 0 then
+        sequence_state.levels = new_levels
+        sequence_state.buffered_levels = nil
+        update_main_exits()
+    else
+        sequence_state.buffered_levels  = new_levels
+    end
+end
+
 -- If the levels were updated while on a run, apply the changes when entering the camp.
 local function convert_buffered_levels()
     if sequence_state.buffered_levels then
