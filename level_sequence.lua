@@ -549,9 +549,17 @@ local function load_level(level, ctx)
             background_texture = level.background_texture,
             floor_theme = level.floor_theme,
             floor_texture_theme = level.floor_texture_theme,
-            floor_texture = level.floor_texture,
-            post_configure = level.post_configure,
+            floor_texture = level.floor_texture
         }
+        theme_properties.post_configure = function(theme, subtheme, theme_properties)
+            if level._post_configure then
+                level._post_configure(theme, subtheme, theme_properties)
+            end
+
+            if level.post_configure then
+                level.post_configure(theme, subtheme, theme_properties)
+            end
+        end
     end
     if loaded_level ~= nil and equal_levels(loaded_level, level) and not has_reset then
         level.load_next_room()
@@ -1175,6 +1183,9 @@ local function setup_level(level_info)
         screen_callbacks = {},
         vanilla_sound_callbacks = {},
         entity_callbacks = {},
+        jellyfish = {},
+        orbs_to_spawn = {},
+        spawning_jellyfish = false,
     }
 
     function level_info.attach_callback(callback_id)
@@ -1193,9 +1204,77 @@ local function setup_level(level_info)
         level_state.entity_callbacks[#level_state.entity_callbacks+1] = { entity_id = entity_id, id = callback_id }
     end
 
+    if level_info.spawn_door_jellyfish then
+        level_info._post_configure = function(theme, subtheme, theme_properties)
+            theme:pre(THEME_OVERRIDE.SPAWN_EFFECTS, function()
+                for _, exit_door in pairs(state.level_gen.exit_doors) do
+                    level_state.spawning_jellyfish = true
+                    spawn_entity(ENT_TYPE.MONS_MEGAJELLYFISH, exit_door.x, exit_door.y, LAYER.FRONT, 0, 0)
+                    level_state.spawning_jellyfish = false
+                end
+            end)
+        end
+    end
     function level_info.load_level()
         if level_state.loaded then return end
         level_state.loaded = true
+
+        if not level_info.skip_co_fixes then
+            level_info.attach_callback(set_post_entity_spawn(function(jelly)
+                jelly.orb_uid = jelly.uid
+                level_state.jellyfish[#level_state.jellyfish+1] = jelly.uid
+            end, SPAWN_TYPE.ANY, MASK.MONSTER, ENT_TYPE.MONS_MEGAJELLYFISH))
+
+            level_info.attach_callback(set_post_entity_spawn(function(orb, spawn_flags)
+                -- Extra check here since we are spawning the jellyfish by script, so the orbs are also spawned by script.
+                if (spawn_flags & SPAWN_TYPE.SCRIPT == 0) or level_state.spawning_jellyfish then
+                    if #level_state.orbs_to_spawn > 0 then
+                        -- Move spawned orbs to the position of orb tilecodes.
+                        local pos = level_state.orbs_to_spawn[1]
+                        table.remove(level_state.orbs_to_spawn, 1)
+                        move_entity(orb.uid, pos.x, pos.y, 0, 0, pos.layer)
+                    else
+                        -- When there are fewer orb tilecodes than spawned orbs, kill the orb instead.
+                        orb.flags = set_flag(orb.flags, ENT_FLAG.DEAD)
+                        orb:destroy()
+                        return
+                    end
+                end
+
+                orb:set_post_destroy(function()
+                    local orb_uids = get_entities_by_type(ENT_TYPE.ITEM_FLOATING_ORB)
+                    local live_orbs = false
+                    for _, orb_uid in pairs(orb_uids) do
+                        if not test_flag(get_entity(orb_uid).flags, ENT_FLAG.DEAD) then
+                            live_orbs = true
+                            break
+                        end
+                    end
+                    if not live_orbs then
+                        for _, jellyfish in pairs(level_state.jellyfish) do
+                            get_entity(jellyfish).move_state = 6
+                        end
+                    end
+                end)
+            end, SPAWN_TYPE.ANY, MASK.ITEM, ENT_TYPE.ITEM_FLOATING_ORB))
+
+            level_info.attach_callback(set_callback(function()
+                if not level_state.loaded then return end
+
+                -- Actually spawn any additional orbs now that the natural orbs have spawned.
+                for _, orb in pairs(level_state.orbs_to_spawn) do
+                    local orb_entity = get_entity(spawn_entity(ENT_TYPE.ITEM_FLOATING_ORB, orb.x, orb.y, orb.layer, 0, 0))
+                    -- Makes the orb have a consistent position, can be set to anything 0-255.
+                    orb_entity.timer = 0
+                end
+            end, ON.LEVEL))
+
+            level_info.attach_callback(set_pre_tile_code_callback(function(x, y, layer)
+                -- Instead of spawning the orbs during level generation, store the locations and spawn them later.
+                level_state.orbs_to_spawn[#level_state.orbs_to_spawn+1] = {x=x, y=y, layer=layer}
+                return true
+            end, "cosmic_orb"))
+        end
 
         if level_info.on_load_level then
             level_info.on_load_level()
@@ -1210,6 +1289,8 @@ local function setup_level(level_info)
         local vanilla_sound_callbacks_to_clear = level_state.vanilla_sound_callbacks
         local entity_callbacks_to_clear = level_state.entity_callbacks
         level_state.loaded = false
+        level_state.jellyfish = {}
+        level_state.orbs_to_spawn = {}
         level_state.callbacks = {}
         level_state.screen_callbacks = {}
         level_state.vanilla_sound_callbacks = {}
